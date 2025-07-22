@@ -1,6 +1,13 @@
 # MazeLLM
 MazeLLM: Solving Mazes with Language Models
 
+# Path Finding
+<p align="center">
+  <a href="https://excalidraw.com/#json=VrLbNlJTp0jjCZJ-t8U-3,yWYmD7WfJaijoeX5uEnBSg">
+    <img src="block-diagram.svg" alt="Path Finding diagram" width="125%" />
+  </a>
+</p>
+
 
 # To run openai api calling demo
 ```bash
