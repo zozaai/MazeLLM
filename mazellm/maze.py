@@ -10,30 +10,31 @@ class Maze():
 
     def generate_maze(self):
         def carve(x, y):
-            self.board[x, y] = 0
-            directions = [[0,2], [2,0], [0,-2], [-2,0]]
+            self.board[y, x] = 0 # Use (y, x) for numpy array indexing
+            directions = [[0, 2], [2, 0], [0, -2], [-2, 0]]
 
             random.shuffle(directions)
 
             for dx, dy in directions:
                 nx, ny = x + dx, y + dy
-                
-                if 0 <= nx < self.n and 0 <= ny < self.m and self.board[nx, ny] == 1:
-                    self.board[x + dx//2, y + dy//2 ] = 0
-                    carve(nx,ny)
 
+                if 0 <= ny < self.m and 0 <= nx < self.n and self.board[ny, nx] == 1:
+                    self.board[y + dy // 2, x + dx // 2] = 0
+                    carve(nx, ny)
 
-        carve(1,1)
-        self.board[0,0] = "S"
-        self.board[self.n -2, self.m - 2] = "E"
+        # Start carving from a valid position
+        carve(1, 1)
+        # Place Start and End on walkable tiles
+        self.board[1, 1] = "S"
+        self.board[self.m - 2, self.n - 2] = "E"
 
     def is_barrier(self, x: int, y: int):
-        # FIXME
-        return False
-
+        """Checks if a cell at (x, y) is a barrier (wall)."""
+        if 0 <= y < self.m and 0 <= x < self.n:
+            return self.board[y, x] == 1
+        return True # Out of bounds is considered a barrier
 
 if __name__ == "__main__":
-    maze = Maze()    
+    maze = Maze()
     maze.generate_maze()
     print(maze.board)
-
