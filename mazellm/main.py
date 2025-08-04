@@ -7,12 +7,16 @@ from maze import Maze
 from robot import Robot
 from llm_agent import LLMAgent
 
+from mazellm import maze
+
+
 class MazeSolverApp(App):
     CSS = """
     Horizontal { height: 100%; }
     InfoPanel { width: 30%; border: solid green; padding:1; }
     MazePanel { width: 70%; border: solid cyan; padding:1; }
     """
+
 
     def __init__(self, maze_size: int = 10, **kwargs):
         super().__init__(**kwargs)
