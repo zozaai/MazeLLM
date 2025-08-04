@@ -29,9 +29,9 @@ class MazePanel(Widget):
 
     def render(self):
         rows = []
-        for y in range(self.maze.size):
+        for y in range(self.maze.m):
             row = []
-            for x in range(self.maze.size):
+            for x in range(self.maze.n):
                 if (x,y) == self.position:
                     row.append("🤖")
                 elif self.maze.is_barrier(x,y):

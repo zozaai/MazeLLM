@@ -1,11 +1,11 @@
+# maze.py
 import random
 import numpy as np
 
-
 class Maze():
     def __init__(self, n: int = 5, m: int = 5):
-        self.n = n
-        self.m = m
+        self.n = n # in x direction
+        self.m = m # in y direction
         self.board = np.ones((self.n, self.m), dtype=object)
 
     def generate_maze(self):
@@ -26,6 +26,11 @@ class Maze():
         carve(1,1)
         self.board[0,0] = "S"
         self.board[self.n -2, self.m - 2] = "E"
+
+    def is_barrier(self, x: int, y: int):
+        # FIXME
+        return False
+
 
 if __name__ == "__main__":
     maze = Maze()    
