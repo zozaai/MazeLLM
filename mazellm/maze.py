@@ -2,30 +2,33 @@ import random
 import numpy as np
 
 
-def generate_maze(n=5, m=5):
-    maze = np.ones((n, m), dtype=object)
+class Maze():
+    def __init__(self, n: int = 5, m: int = 5):
+        self.n = n
+        self.m = m
+        self.board = np.ones((self.n, self.m), dtype=object)
 
-    def carve(x, y):
-        maze[x, y] = 0
-        directions = [[0,2], [2,0], [0,-2], [-2,0]]
+    def generate_maze(self):
+        def carve(x, y):
+            self.board[x, y] = 0
+            directions = [[0,2], [2,0], [0,-2], [-2,0]]
 
-        random.shuffle(directions)
+            random.shuffle(directions)
 
-        for dx, dy in directions:
-            nx, ny = x + dx, y + dy
-            
-            if 0 <= nx < n and 0 <= ny < m and maze[nx, ny] == 1:
-                maze[x + dx//2, y + dy//2 ] = 0
-                carve(nx,ny)
+            for dx, dy in directions:
+                nx, ny = x + dx, y + dy
+                
+                if 0 <= nx < self.n and 0 <= ny < self.m and self.board[nx, ny] == 1:
+                    self.board[x + dx//2, y + dy//2 ] = 0
+                    carve(nx,ny)
 
 
-    carve(1,1)
-    maze[0,0] = "S"
-    maze[n -2, m - 2] = "E"
-
-    return maze
+        carve(1,1)
+        self.board[0,0] = "S"
+        self.board[self.n -2, self.m - 2] = "E"
 
 if __name__ == "__main__":
-    maze = generate_maze()
-    print(maze)
+    maze = Maze()    
+    maze.generate_maze()
+    print(maze.board)
 
