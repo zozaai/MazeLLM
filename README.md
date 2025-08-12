@@ -17,3 +17,8 @@ python src/openai_api_calling_demo.py
 
 python -m src.openai_api_calling_demo
 ```
+
+# how to run the maze with random next steps
+```bash
+python -m mazellm.main --n 4 --m 4
+```

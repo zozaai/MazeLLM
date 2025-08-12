@@ -1,44 +1,55 @@
-/* mazellm/visualizer/maze_visualizer.tcss */
-
-/* Main layout containers */
-Horizontal {
+/* ===== Layout ===== */
+#main-container {
+    layout: horizontal;
+    width: 100%;
     height: 100%;
 }
 
-InfoPanel {
-    width: 30%;
-    border: solid green;
-    padding: 1;
+/* Left panel */
+#left-panel {
+    width: 32;
+    height: 100%;
+    background: $panel;
+    border-right: thick solid $primary;
 }
 
-/* The MazePanel is now a grid container */
-MazePanel {
-    width: 70%;
-    align: center middle; /* Center the grid within the panel */
+#left-panel-content {
+    content-align: left top;
+    width: 100%;
+    height: 100%;
+    padding: 1 2;
+    overflow: auto;
 }
 
-/* Define the grid itself */
-#maze-grid {
+/* Right panel */
+#right-panel {
+    width: 1fr;
+    height: 100%;
+    layout: vertical;
+    align: center middle;
+}
+
+/* ===== Maze board ===== */
+#chess-board {
     layout: grid;
-    /* The grid size will be set from Python */
     grid-gutter: 0;
-    /* Let's make it look squarish */
-    width: 90%;
-    height: 90%;
+    width: 60;
+    height: 30;
 }
 
-/* Base style for all cells (Static widgets) inside the grid */
-#maze-grid > Static {
+#chess-board > .tile {
     width: 1fr;
     height: 1fr;
-    border: solid black;
-    content-align: center middle;
-    color: white;
-    text-style: bold;
 }
 
-/* Define background colors using classes */
-.free-cell { background: green; }
-.blocked-cell { background: red; }
-.start-cell { background: #0000FF; } /* Blue */
-.end-cell { background: #800080; }   /* Purple */
+#chess-board > .tile.light {
+    background: #F0D9B5;
+}
+
+#chess-board > .tile.dark {
+    background: #B58863;
+}
+
+#chess-board > .tile.robot {
+    background: red;
+}
