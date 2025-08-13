@@ -18,7 +18,12 @@ python src/openai_api_calling_demo.py
 python -m src.openai_api_calling_demo
 ```
 
-# how to run the maze with random next steps
+# how to run the maze with random next steps (textual visualization)
 ```bash
 python -m mazellm.main --n 4 --m 4
+```
+
+# how to run the maze with random next steps (typer visualization)
+```bash
+python -m mazellm.cli animate --n 8 "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" --interval 0.5
 ```
