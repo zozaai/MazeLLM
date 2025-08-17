@@ -1,0 +1,55 @@
+/* ===== Layout ===== */
+#main-container {
+    layout: horizontal;
+    width: 100%;
+    height: 100%;
+}
+
+/* Left panel */
+#left-panel {
+    width: 32;
+    height: 100%;
+    background: $panel;
+    border-right: thick solid $primary;
+}
+
+#left-panel-content {
+    content-align: left top;
+    width: 100%;
+    height: 100%;
+    padding: 1 2;
+    overflow: auto;
+}
+
+/* Right panel */
+#right-panel {
+    width: 1fr;
+    height: 100%;
+    layout: vertical;
+    align: center middle;
+}
+
+/* ===== Maze board ===== */
+#chess-board {
+    layout: grid;
+    grid-gutter: 0;
+    width: 60;
+    height: 30;
+}
+
+#chess-board > .tile {
+    width: 1fr;
+    height: 1fr;
+}
+
+#chess-board > .tile.light {
+    background: #F0D9B5;
+}
+
+#chess-board > .tile.dark {
+    background: #B58863;
+}
+
+#chess-board > .tile.robot {
+    background: red;
+}
