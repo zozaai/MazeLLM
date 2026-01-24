@@ -11,11 +11,7 @@ MazeLLM: Solving Mazes with Language Models
 
 # To run openai api calling demo
 ```bash
-python src/openai_api_calling_demo.py
-
-# or
-
-python -m src.openai_api_calling_demo
+python -m mazellm.openai_api_calling_demo
 ```
 
 # how to run the maze with random next steps (textual visualization)
@@ -25,5 +21,17 @@ python -m mazellm.main --n 4 --m 4
 
 # how to run the maze with random next steps (typer visualization)
 ```bash
-python -m mazellm.cli animate --n 8 "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" "1,1" "1,2" "2,2" "3,2" --interval 0.5
+python -m mazellm.cli animate --n 4 \
+"1,1" "1,2" "2,2" "2,1" "3,1" "3,2" "2,2" "2,3" \
+"3,3" "4,3" "4,2" "3,2" "3,3" "3,4" "4,4" \
+--interval 0.1
+```
+
+```bash
+python -m mazellm.cli animate --n 8 \
+"1,1" "1,2" "2,2" "2,3" "3,3" "3,2" "4,2" "4,3" "4,4" \
+"3,4" "3,5" "4,5" "5,5" "5,4" "6,4" "6,5" "6,6" \
+"5,6" "5,7" "6,7" "7,7" "7,6" "8,6" "8,7" "8,8" \
+--interval 0.5
+
 ```
