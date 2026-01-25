@@ -1,24 +1,38 @@
+# mazellm/visualizer/panels.py
 from __future__ import annotations
+
 import argparse
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Static, Header, Footer
+from pathlib import Path
+
+from mazellm.maze import Maze
 
 
 class MazePanel(App):
-    """An nxn maze-like board with a two-panel layout."""
-    CSS_PATH = "maze_visualizer.tcss"
-    BINDINGS = [
-        ("q", "quit", "Quit"),  # Press q to quit
-    ]
+    """
+    Visualize a Maze object (maze.board) with a two-panel layout.
+      - S (start): green
+      - E (end): blue
+      - wall (1): black
+      - free (0): white
+      - robot: red (optional, if set_robot_position is used)
+    """
 
-    def __init__(self, n: int = 5, **kwargs):
+    CSS_PATH = Path(__file__).with_name("maze_visualizer.tcss")
+    BINDINGS = [("q", "quit", "Quit")]
+
+    def __init__(self, maze: Maze, **kwargs):
         super().__init__(**kwargs)
-        self.n = max(1, n)
+        self.maze = maze
+        self.rows = int(getattr(maze, "m", 1))  # y / rows
+        self.cols = int(getattr(maze, "n", 1))  # x / cols
+
         self.tiles: list[Static] = []
-        self.robot_pos: tuple[int, int] | None = None
+        self.robot_pos: tuple[int, int] | None = None  # (row, col)
         self.info_panel: Static | None = None
-        self.logs: list[str] = [f"{self.n}x{self.n} maze"]  # initial message
+        self.logs: list[str] = [f"{self.rows}x{self.cols} maze"]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -26,79 +40,93 @@ class MazePanel(App):
             with Container(id="left-panel"):
                 self.info_panel = Static("\n".join(self.logs), id="left-panel-content")
                 yield self.info_panel
+
             with Container(id="right-panel"):
                 with Container(id="chess-board"):
-                    for r in range(self.n):
-                        for c in range(self.n):
-                            tile_class = "dark" if (r + c) % 2 else "light"
-                            tile = Static(classes=f"tile {tile_class}")
+                    for r in range(self.rows):
+                        for c in range(self.cols):
+                            tile = Static(classes="tile")
                             self.tiles.append(tile)
                             yield tile
         yield Footer()
 
     def on_mount(self) -> None:
         board = self.query_one("#chess-board", Container)
-        board.styles.grid_size_rows = self.n
-        board.styles.grid_size_columns = self.n
+        board.styles.grid_size_rows = self.rows
+        board.styles.grid_size_columns = self.cols
+        self.render_maze()
 
     def action_quit(self) -> None:
-        """Quit the application."""
         self.exit()
 
     def log_info(self, message: str) -> None:
-        """Append a message to the info panel."""
         self.logs.append(message)
         if self.info_panel:
-            self.info_panel.update("\n".join(self.logs[-20:]))  # keep last 20 lines
+            self.info_panel.update("\n".join(self.logs[-20:]))
+
+    def _idx(self, row: int, col: int) -> int:
+        return row * self.cols + col
+
+    def render_maze(self) -> None:
+        """
+        Paint all tiles based on maze.board values:
+          - "S" -> start
+          - "E" -> end
+          - 1   -> wall
+          - else -> free
+        """
+        for r in range(self.rows):
+            for c in range(self.cols):
+                idx = self._idx(r, c)
+                cell = self.maze.board[r, c]
+
+                # Clear all known state classes (except base "tile")
+                for cls in ("start", "end", "wall", "free", "robot"):
+                    self.tiles[idx].set_class(False, cls)
+
+                if cell == "S":
+                    self.tiles[idx].set_class(True, "start")
+                elif cell == "E":
+                    self.tiles[idx].set_class(True, "end")
+                elif cell == 1:
+                    self.tiles[idx].set_class(True, "wall")
+                else:
+                    self.tiles[idx].set_class(True, "free")
+
+        # Re-apply robot highlight if set
+        if self.robot_pos is not None:
+            rr, cc = self.robot_pos
+            if 0 <= rr < self.rows and 0 <= cc < self.cols:
+                self.tiles[self._idx(rr, cc)].set_class(True, "robot")
 
     def set_robot_position(self, row: int, col: int) -> None:
-        """Highlight the robot's cell in red and update info panel."""
-        if not (0 <= row < self.n and 0 <= col < self.n):
-            self.log(f"Invalid robot position: ({row}, {col})")
+        """Highlight robot cell in red (overlays whatever is underneath)."""
+        if not (0 <= row < self.rows and 0 <= col < self.cols):
+            self.log_info(f"Invalid robot position: ({row}, {col})")
             return
 
-        # Reset old robot cell to original color
+        # Remove old robot highlight
         if self.robot_pos is not None:
             old_r, old_c = self.robot_pos
-            old_idx = old_r * self.n + old_c
-            base_class = "dark" if (old_r + old_c) % 2 else "light"
-            self.tiles[old_idx].set_class(False, "robot")
-            self.tiles[old_idx].set_class(True, base_class)
+            self.tiles[self._idx(old_r, old_c)].set_class(False, "robot")
 
-        # Set new robot cell to red
-        idx = row * self.n + col
-        self.tiles[idx].set_class(True, "robot")
+        # Apply new
         self.robot_pos = (row, col)
-
-        # Log new location
+        self.tiles[self._idx(row, col)].set_class(True, "robot")
         self.log_info(f"Current location ({row},{col})")
 
 
 def _parse_args():
-    p = argparse.ArgumentParser(description="nxn maze TUI")
-    p.add_argument("--n", type=int, default=5, help="Board size (nxn). Default: 5")
+    p = argparse.ArgumentParser(description="MazeLLM board viewer")
+    p.add_argument("--n", type=int, default=15, help="Maze width (columns)")
+    p.add_argument("--m", type=int, default=15, help="Maze height (rows)")
+    p.add_argument("--seed", type=int, default=None, help="Seed for reproducibility")
     return p.parse_args()
 
 
 if __name__ == "__main__":
     args = _parse_args()
-    app = MazePanel(n=args.n)
-
-    path = [(1, 1), (1, 2), (2, 2), (3, 2)]  # list of positions
-    delay = 0.1  # seconds (100 ms)
-
-    def run_path(step: int = 0):
-        if step < len(path):
-            if step > 0:
-                app.log_info(f"Moving to {path[step]} ...")
-
-            row, col = path[step]
-            app.set_robot_position(row, col)
-
-            if step < len(path) - 1:
-                app.set_timer(delay / 2, lambda: app.log_info("Finding next step ..."))
-
-            app.set_timer(delay, lambda: run_path(step + 1))
-
-    app.call_after_refresh(lambda: run_path(0))
-    app.run()
+    maze = Maze(n=args.n, m=args.m, seed=args.seed)
+    maze.generate_maze()
+    print(maze.board)
+    MazePanel(maze=maze).run()
