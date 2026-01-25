@@ -6,8 +6,8 @@ from textual.widgets import Static, Header, Footer
 
 
 class MazePanel(App):
-    """An n×n maze-like board with a two-panel layout."""
-    CSS_PATH = "visualizer/maze_visualizer.tcss"
+    """An nxn maze-like board with a two-panel layout."""
+    CSS_PATH = "maze_visualizer.tcss"
     BINDINGS = [
         ("q", "quit", "Quit"),  # Press q to quit
     ]
@@ -75,8 +75,8 @@ class MazePanel(App):
 
 
 def _parse_args():
-    p = argparse.ArgumentParser(description="n×n maze TUI")
-    p.add_argument("--n", type=int, default=5, help="Board size (n×n). Default: 5")
+    p = argparse.ArgumentParser(description="nxn maze TUI")
+    p.add_argument("--n", type=int, default=5, help="Board size (nxn). Default: 5")
     return p.parse_args()
 
 
