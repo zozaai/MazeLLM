@@ -128,5 +128,4 @@ if __name__ == "__main__":
     args = _parse_args()
     maze = Maze(n=args.n, m=args.m, seed=args.seed)
     maze.generate_maze()
-    print(maze.board)
     MazePanel(maze=maze).run()
