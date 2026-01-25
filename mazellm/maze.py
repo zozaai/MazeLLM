@@ -5,13 +5,13 @@ import numpy as np
 
 """
 # default 5x5
-python maze.py
+python -m mazellm.maze
 
 # rectangular maze
-python maze.py -n 8 -m 4
+python -m mazellm.maze -n 8 -m 4 
 
 # reproducible maze
-python maze.py -n 10 -m 10 --seed 123
+python -m mazellm.maze -n 10 -m 10 --seed 123
 
 """
 
