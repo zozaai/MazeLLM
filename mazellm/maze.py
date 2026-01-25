@@ -21,15 +21,13 @@ class Maze:
         self.n = n  # x direction (columns)
         self.m = m  # y direction (rows)
         self.board = np.ones((self.m, self.n), dtype=object)
-
-        if seed is not None:
-            random.seed(seed)
+        self._rng = random.Random(seed)
 
     def generate_maze(self):
         def carve(x: int, y: int):
             self.board[y, x] = 0
             directions = [(0, 2), (2, 0), (0, -2), (-2, 0)]
-            random.shuffle(directions)
+            self._rng.shuffle(directions)
 
             for dx, dy in directions:
                 nx, ny = x + dx, y + dy
