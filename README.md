@@ -9,15 +9,6 @@ MazeLLM: Solving Mazes with Language Models
 </p>
 
 
-# To run openai api calling demo
-```bash
-python -m mazellm.openai_api_calling_demo
-```
-
-# how to run the maze with random next steps (textual visualization)
-```bash
-python -m mazellm.main --n 4 --m 4
-```
 
 # how to run the maze with random next steps (typer visualization)
 ```bash
