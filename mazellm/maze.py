@@ -105,24 +105,3 @@ class Maze:
             return self.board[y, x] == 1
         return True
 
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate a randomized maze.")
-    parser.add_argument("-c", "--cols", type=int, default=5, help="maze width (columns)")
-    parser.add_argument("-r", "--rows", type=int, default=5, help="maze height (rows)")
-    parser.add_argument("--seed", type=int, default=None, help="random seed (optional)")
-    return parser.parse_args()
-
-def main() -> None:
-    args = parse_args()
-
-    if args.cols <= 0 or args.rows <= 0:
-        raise SystemExit("rows and columns must be positive integers.")
-
-    maze = Maze(cols=args.cols, rows=args.rows, seed=args.seed)
-    maze.generate_maze()
-    print(maze.board)
-
-
-if __name__ == "__main__":
-    main()

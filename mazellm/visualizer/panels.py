@@ -115,17 +115,3 @@ class MazePanel(App):
         self.tiles[self._idx(row, col)].set_class(True, "robot")
         self.log_info(f"Current location ({row},{col})")
 
-
-def _parse_args():
-    p = argparse.ArgumentParser(description="MazeLLM board viewer")
-    p.add_argument("--n", type=int, default=15, help="Maze width (columns)")
-    p.add_argument("--m", type=int, default=15, help="Maze height (rows)")
-    p.add_argument("--seed", type=int, default=None, help="Seed for reproducibility")
-    return p.parse_args()
-
-
-if __name__ == "__main__":
-    args = _parse_args()
-    maze = Maze(n=args.n, m=args.m, seed=args.seed)
-    maze.generate_maze()
-    MazePanel(maze=maze).run()
