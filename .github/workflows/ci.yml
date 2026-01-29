@@ -30,8 +30,9 @@ jobs:
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml
 
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
         with:
-          name: coverage-xml
-          path: coverage.xml
+          files: coverage.xml
+          flags: unit
+          name: MazeLLM
