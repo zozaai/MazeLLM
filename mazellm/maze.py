@@ -11,17 +11,17 @@ import numpy as np
 python -m mazellm.maze
 
 # rectangular maze
-python -m mazellm.maze -n 8 -m 4
+python -m mazellm.maze -c 8 -r 4
 
 # reproducible maze
-python -m mazellm.maze -n 10 -m 10 --seed 123
+python -m mazellm.maze -c 10 -r 10 --seed 123
 """
 
 
 class Maze:
-    def __init__(self, n: int = 5, m: int = 5, seed: int | None = None):
-        self.n = n  # x direction (columns)
-        self.m = m  # y direction (rows)
+    def __init__(self, cols: int = 5, rows: int = 5, seed: int | None = None):
+        self.n = cols  # Internally still n for x/columns
+        self.m = rows  # Internally still m for y/rows
         self.board = np.ones((self.m, self.n), dtype=object)
         self._rng = random.Random(seed)
 
@@ -107,22 +107,20 @@ class Maze:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate a randomized maze using recursive backtracking.")
-    parser.add_argument("-n", "--n", type=int, default=5, help="maze width (x / columns)")
-    parser.add_argument("-m", "--m", type=int, default=5, help="maze height (y / rows)")
+    parser = argparse.ArgumentParser(description="Generate a randomized maze.")
+    parser.add_argument("-c", "--cols", type=int, default=5, help="maze width (columns)")
+    parser.add_argument("-r", "--rows", type=int, default=5, help="maze height (rows)")
     parser.add_argument("--seed", type=int, default=None, help="random seed (optional)")
     return parser.parse_args()
-
 
 def main() -> None:
     args = parse_args()
 
-    if args.n <= 0 or args.m <= 0:
-        raise SystemExit("n and m must be positive integers.")
+    if args.cols <= 0 or args.rows <= 0:
+        raise SystemExit("rows and columns must be positive integers.")
 
-    maze = Maze(n=args.n, m=args.m, seed=args.seed)
+    maze = Maze(cols=args.cols, rows=args.rows, seed=args.seed)
     maze.generate_maze()
-
     print(maze.board)
 
 

@@ -25,9 +25,10 @@ def _make_maze_from_board(board_2d) -> Maze:
     Helper: build a Maze object with a specific board.
     board_2d is indexed [row][col] like Maze.board.
     """
-    m = len(board_2d)
-    n = len(board_2d[0]) if m else 0
-    maze = Maze(n=n, m=m, seed=0)
+    rows = len(board_2d)
+    cols = len(board_2d[0]) if rows else 0
+    # Updated: renamed keyword arguments from n/m to cols/rows
+    maze = Maze(cols=cols, rows=rows, seed=0)
     maze.board = np.array(board_2d, dtype=object)
     return maze
 
@@ -44,8 +45,8 @@ def test_render_maze_assigns_classes_start_end_wall_free():
     panel = MazePanel(maze=maze)
 
     # Inject fake tiles (normally created in compose())
-    panel.tiles = [FakeTile() for _ in range(panel.rows * panel.cols)]
-
+    panel.tiles = [FakeTile() for _ in range(panel.rows * panel.cols)]  # type: ignore
+    
     panel.render_maze()
 
     # (0,0) -> start
@@ -80,7 +81,7 @@ def test_render_maze_robot_overlay_is_applied():
     ])
 
     panel = MazePanel(maze=maze)
-    panel.tiles = [FakeTile() for _ in range(panel.rows * panel.cols)]
+    panel.tiles = [FakeTile() for _ in range(panel.rows * panel.cols)] # type: ignore
 
     # Pretend robot is at (0,1)
     panel.robot_pos = (0, 1)

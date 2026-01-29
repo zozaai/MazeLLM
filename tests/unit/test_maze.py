@@ -46,13 +46,13 @@ def _reachable(board: np.ndarray, start_rc: tuple[int, int], goal_rc: tuple[int,
 
 
 def test_generate_maze_sets_shape():
-    maze = Maze(n=8, m=4, seed=123)
+    maze = Maze(cols=8, rows=4, seed=123)
     maze.generate_maze()
     assert maze.board.shape == (4, 8)  # (rows=m, cols=n)
 
 
 def test_generate_maze_places_start_and_end_and_end_is_reachable():
-    maze = Maze(n=5, m=5, seed=123)
+    maze = Maze(cols=5, rows=5, seed=123)
     maze.generate_maze()
 
     # Start is fixed at top-left
@@ -69,7 +69,7 @@ def test_generate_maze_places_start_and_end_and_end_is_reachable():
 
 
 def test_is_barrier_out_of_bounds_is_true():
-    maze = Maze(n=5, m=5, seed=123)
+    maze = Maze(cols=5, rows=5, seed=123)
     maze.generate_maze()
 
     assert maze.is_barrier(-1, 0) is True
@@ -79,7 +79,7 @@ def test_is_barrier_out_of_bounds_is_true():
 
 
 def test_is_barrier_respects_board_values():
-    maze = Maze(n=5, m=5, seed=123)
+    maze = Maze(cols=5, rows=5, seed=123)
     maze.generate_maze()
 
     # force known cells
@@ -91,8 +91,8 @@ def test_is_barrier_respects_board_values():
 
 
 def test_generate_maze_is_reproducible_with_seed():
-    m1 = Maze(n=15, m=15, seed=999)
-    m2 = Maze(n=15, m=15, seed=999)
+    m1 = Maze(cols=15, rows=15, seed=999)
+    m2 = Maze(cols=15, rows=15, seed=999)
 
     m1.generate_maze()
     m2.generate_maze()
@@ -101,8 +101,8 @@ def test_generate_maze_is_reproducible_with_seed():
 
 
 def test_generate_maze_different_seeds_usually_different():
-    m1 = Maze(n=15, m=15, seed=1)
-    m2 = Maze(n=15, m=15, seed=2)
+    m1 = Maze(cols=15, rows=15, seed=1)
+    m2 = Maze(cols=15, rows=15, seed=2)
 
     m1.generate_maze()
     m2.generate_maze()

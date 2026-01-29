@@ -16,7 +16,8 @@ def _make_sample_maze() -> Maze:
         ],
         dtype=object,
     )
-    maze = Maze(n=5, m=5, seed=123)
+    # Updated: n -> cols, m -> rows
+    maze = Maze(cols=5, rows=5, seed=123)
     maze.board = board
     return maze
 
@@ -88,5 +89,5 @@ def test_s_and_e_are_walkable_for_sensor():
     s = robot.sensor()
     assert s["right"] == 0
     assert s["down"] == 0
-    assert s["left"] == 0          # wall at (3,4)
-    assert s["up"] == 4            # (4,3..0) are all 0
+    assert s["left"] == 0
+    assert s["up"] == 4

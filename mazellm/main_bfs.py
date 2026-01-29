@@ -123,8 +123,9 @@ class DemoMazePanel(MazePanel):
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MazeLLM demo: solve maze and visualize robot step-by-step.")
-    p.add_argument("--n", type=int, default=15, help="Maze width (columns)")
-    p.add_argument("--m", type=int, default=15, help="Maze height (rows)")
+    # Renamed --n to -c/--cols and --m to -r/--rows
+    p.add_argument("-c", "--cols", type=int, default=15, help="Maze width (columns)")
+    p.add_argument("-r", "--rows", type=int, default=15, help="Maze height (rows)")
     p.add_argument("--seed", type=int, default=None, help="Seed for reproducibility")
     p.add_argument("--interval", type=float, default=0.15, help="Seconds between steps")
     return p.parse_args()
@@ -132,10 +133,12 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
-    if args.n <= 0 or args.m <= 0:
-        raise SystemExit("n and m must be positive integers.")
+    # Updated to use new attribute names from args
+    if args.cols <= 0 or args.rows <= 0:
+        raise SystemExit("rows and columns must be positive integers.")
 
-    maze = Maze(n=args.n, m=args.m, seed=args.seed)
+    # Note: Maze(n=cols, m=rows) maintains original internal logic
+    maze = Maze(cols=args.cols, rows=args.rows, seed=args.seed)
     maze.generate_maze()
 
     start = _find_cell(maze, "S")
