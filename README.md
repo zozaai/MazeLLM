@@ -1,8 +1,18 @@
-# MazeLLM
+
+<p align="center">
+  <a href="https://github.com/zozaai/MazeLLM/actions/workflows/ci.yml">
+    <img src="https://github.com/zozaai/MazeLLM/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+  <a href="https://codecov.io/gh/zozaai/MazeLLM">
+    <img src="https://codecov.io/gh/zozaai/MazeLLM/branch/main/graph/badge.svg" alt="codecov">
+  </a>
+</p>
+
+
 
 <p align="center">
   <a href="https://excalidraw.com/#json=VrLbNlJTp0jjCZJ-t8U-3,yWYmD7WfJaijoeX5uEnBSg">
-    <img src="docs/block-diagram.svg" alt="MazeLLM architecture diagram" width="125%" />
+    <img src="docs/block-diagram.svg" alt="MazeLLM architecture diagram" width="70%" />
   </a>
 </p>
 
