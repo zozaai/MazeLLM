@@ -1,81 +1,76 @@
 # tests/unit/test_bfs.py
+import pytest
 import numpy as np
-
 from mazellm.bfs import BFS
 from mazellm.maze import Maze
 from mazellm.robot import Position
 
+def _assert_path_integrity(maze: Maze, path: list[Position], start: Position, end: Position):
+    """Common utility to verify path rules."""
+    assert path[0] == start, f"Path must start at {start}"
+    assert path[-1] == end, f"Path must end at {end}"
+    for i in range(len(path) - 1):
+        a, b = path[i], path[i+1]
+        # Must be 4-connected
+        assert abs(a.x - b.x) + abs(a.y - b.y) == 1
+        # Must not be a wall
+        assert not maze.is_barrier(b.x, b.y), f"Path hits wall at {b}"
 
-def _make_sample_maze() -> Maze:
-    """
-    Same sample layout used in test_robot.py (easy to reason about).
-
-    Board is indexed [row, col] == [y, x]
-    S at (x=0,y=0), E at (x=4,y=4)
-    """
-    board = np.array(
-        [
-            ["S", 1, 0, 0, 0],
-            [0,   1, 0, 1, 0],
-            [0,   1, 0, 1, 0],
-            [0,   1, 0, 1, 0],
-            [0,   0, 0, 1, "E"],
-        ],
-        dtype=object,
-    )
-    maze = Maze(cols=5, rows=5, seed=123)
+def test_bfs_shortest_path_on_ring_maze():
+    """Test BFS finds the shortest route when two paths exist."""
+    # S 0 0
+    # 0 1 0
+    # 0 0 E
+    # Shortest path is 5 nodes: (0,0)->(1,0)->(2,0)->(2,1)->(2,2) or similar
+    board = np.array([
+        ["S", 0, 0],
+        [0, 1, 0],
+        [0, 0, "E"]
+    ], dtype=object)
+    maze = Maze(cols=3, rows=3)
     maze.board = board
-    return maze
+    
+    path = BFS().solve(maze, Position(0, 0), Position(2, 2))
+    _assert_path_integrity(maze, path, Position(0, 0), Position(2, 2))
+    assert len(path) == 5
 
+def test_bfs_single_cell_maze():
+    """Edge case: Start and End are the same cell."""
+    maze = Maze(cols=1, rows=1)
+    maze.board = np.array([["S"]], dtype=object) # Treat S as E
+    pos = Position(0, 0)
+    path = BFS().solve(maze, pos, pos)
+    assert path == [pos]
 
-def _is_walkable(maze: Maze, x: int, y: int) -> bool:
-    return (0 <= x < maze.n) and (0 <= y < maze.m) and (not maze.is_barrier(x=x, y=y))
+@pytest.mark.parametrize("seed", [1, 42, 999])
+def test_bfs_on_generated_mazes(seed):
+    """Ensure BFS always finds a path in solvable generated mazes."""
+    maze = Maze(cols=10, rows=10, seed=seed)
+    maze.generate_maze()
+    
+    # Locate S and E from generator
+    s_idx = np.argwhere(maze.board == "S")[0]
+    e_idx = np.argwhere(maze.board == "E")[0]
+    start, end = Position(s_idx[1], s_idx[0]), Position(e_idx[1], e_idx[0])
+    
+    path = BFS().solve(maze, start, end)
+    _assert_path_integrity(maze, path, start, end)
 
-
-def _assert_path_is_valid(maze: Maze, path: list[Position], start: Position, end: Position) -> None:
-    assert len(path) >= 1
-    assert path[0] == start
-    assert path[-1] == end
-
-    # every node is walkable and every step is 4-neighbor adjacent
-    for p in path:
-        assert _is_walkable(maze, p.x, p.y)
-
-    for a, b in zip(path, path[1:]):
-        manhattan = abs(a.x - b.x) + abs(a.y - b.y)
-        assert manhattan == 1
-
-
-def test_bfs_finds_a_valid_path_and_is_shortest_on_sample_maze():
-    maze = _make_sample_maze()
-    start = Position(x=0, y=0)
-    end = Position(x=4, y=4)
-
+def test_bfs_raises_runtime_error_on_blocked_maze():
+    maze = Maze(cols=3, rows=3)
+    # Completely encircle 'E' with walls (1)
+    # S 0 1
+    # 0 0 1
+    # 0 1 E
+    maze.board = np.array([
+        ["S", 0, 1],
+        [0, 0, 1],
+        [0, 1, "E"]
+    ], dtype=object)
+    
     solver = BFS()
-    path = solver.solve(maze=maze, start=start, end=end)
-
-    _assert_path_is_valid(maze, path, start, end)
-
-    # On this specific maze, the shortest path is known.
-    # It must go down to row 4 to bypass the wall column, then route via top row and down.
-    assert len(path) == 17  # 16 moves
-
-
-def test_bfs_raises_if_end_unreachable():
-    maze = _make_sample_maze()
-
-    # Make E unreachable by turning its only column approach into walls
-    # (wall off (4,3) and (3,4), and keep boundaries)
-    maze.board[3, 4] = 1  # (x=4,y=3)
-    maze.board[4, 3] = 1  # (x=3,y=4)
-
     start = Position(x=0, y=0)
-    end = Position(x=4, y=4)
-
-    solver = BFS()
-
-    try:
-        solver.solve(maze=maze, start=start, end=end)
-        assert False, "Expected RuntimeError for unreachable end"
-    except RuntimeError:
-        pass
+    end = Position(x=2, y=2)
+    
+    with pytest.raises(RuntimeError, match="No path found"):
+        solver.solve(maze, start, end)

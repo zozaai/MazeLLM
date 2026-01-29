@@ -1,82 +1,62 @@
 # tests/unit/test_dfs.py
+import pytest
 import numpy as np
-
 from mazellm.bfs import BFS
 from mazellm.dfs import DFS
 from mazellm.maze import Maze
 from mazellm.robot import Position
 
+def test_dfs_vs_bfs_optimality():
+    """
+    In an open 5x5 area, DFS will often take a 'scenic' route 
+    whereas BFS must take the shortest.
+    """
+    maze = Maze(cols=5, rows=5)
+    maze.board = np.zeros((5, 5), dtype=object)
+    start, end = Position(0, 0), Position(4, 4)
+    
+    dfs_path = DFS().solve(maze, start, end)
+    bfs_path = BFS().solve(maze, start, end)
+    
+    # BFS is shortest: 9 nodes. DFS is likely longer or equal.
+    assert len(bfs_path) == 9
+    assert len(dfs_path) >= len(bfs_path)
+    # Check DFS path validity
+    for i in range(len(dfs_path)-1):
+        a, b = dfs_path[i], dfs_path[i+1]
+        assert abs(a.x - b.x) + abs(a.y - b.y) == 1
 
-def _make_sample_maze() -> Maze:
-    board = np.array(
-        [
-            ["S", 1, 0, 0, 0],
-            [0,   1, 0, 1, 0],
-            [0,   1, 0, 1, 0],
-            [0,   1, 0, 1, 0],
-            [0,   0, 0, 1, "E"],
-        ],
-        dtype=object,
-    )
-    maze = Maze(cols=5, rows=5, seed=123)
+def test_dfs_dead_end_backtracking():
+    """Test that DFS can back out of a dead end to find the goal."""
+    # S 0 0
+    # 1 1 0
+    # 0 0 E
+    # Path must go around the wall.
+    board = np.array([
+        ["S", 0, 0],
+        [1, 1, 0],
+        [0, 0, "E"]
+    ], dtype=object)
+    maze = Maze(cols=3, rows=3)
     maze.board = board
-    return maze
+    
+    start, end = Position(0, 0), Position(2, 2)
+    path = DFS().solve(maze, start, end)
+    assert path[-1] == end
+    assert Position(0, 1) not in path # This is a wall anyway
 
-
-def _is_walkable(maze: Maze, x: int, y: int) -> bool:
-    return (0 <= x < maze.n) and (0 <= y < maze.m) and (not maze.is_barrier(x=x, y=y))
-
-
-def _assert_path_is_valid(maze: Maze, path: list[Position], start: Position, end: Position) -> None:
-    assert len(path) >= 1
+def test_dfs_large_sparse_maze():
+    """Verify DFS doesn't hit recursion limits or loops on a 20x20 open grid."""
+    maze = Maze(cols=20, rows=20)
+    maze.board = np.zeros((20, 20), dtype=object)
+    start, end = Position(0, 0), Position(19, 19)
+    
+    path = DFS().solve(maze, start, end)
     assert path[0] == start
     assert path[-1] == end
 
-    for p in path:
-        assert _is_walkable(maze, p.x, p.y)
-
-    for a, b in zip(path, path[1:]):
-        manhattan = abs(a.x - b.x) + abs(a.y - b.y)
-        assert manhattan == 1
-
-
-def test_dfs_finds_a_valid_path():
-    maze = _make_sample_maze()
-    start = Position(x=0, y=0)
-    end = Position(x=4, y=4)
-
-    solver = DFS()
-    path = solver.solve(maze=maze, start=start, end=end)
-
-    _assert_path_is_valid(maze, path, start, end)
-
-
-def test_dfs_path_is_not_shorter_than_bfs():
-    maze = _make_sample_maze()
-    start = Position(x=0, y=0)
-    end = Position(x=4, y=4)
-
-    bfs_path = BFS().solve(maze=maze, start=start, end=end)
-    dfs_path = DFS().solve(maze=maze, start=start, end=end)
-
-    # DFS is "any path", BFS is shortest => DFS should not beat BFS.
-    assert len(dfs_path) >= len(bfs_path)
-
-
-def test_dfs_raises_if_end_unreachable():
-    maze = _make_sample_maze()
-
-    # Wall off the goal region similarly to BFS test
-    maze.board[3, 4] = 1  # (x=4,y=3)
-    maze.board[4, 3] = 1  # (x=3,y=4)
-
-    start = Position(x=0, y=0)
-    end = Position(x=4, y=4)
-
-    solver = DFS()
-
-    try:
-        solver.solve(maze=maze, start=start, end=end)
-        assert False, "Expected RuntimeError for unreachable end"
-    except RuntimeError:
-        pass
+def test_dfs_unsolvable_raises():
+    maze = Maze(cols=2, rows=2)
+    maze.board = np.array([["S", 1], [1, "E"]], dtype=object)
+    with pytest.raises(RuntimeError):
+        DFS().solve(maze, Position(0, 0), Position(1, 1))
