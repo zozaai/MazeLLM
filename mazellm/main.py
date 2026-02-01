@@ -9,7 +9,7 @@ from mazellm.robot import Robot, Position, Direction
 from mazellm.visualizer.panels import MazePanel
 from mazellm.bfs import BFS
 from mazellm.dfs import DFS
-
+from mazellm.astar import AStar
 
 def _find_cell(maze: Maze, value: object) -> Position:
     for y in range(maze.m):
@@ -90,8 +90,9 @@ def _build_solver(method: str):
         return BFS()
     if method == "dfs":
         return DFS()
-    raise SystemExit(f"Unknown method: {method!r}. Use one of: bfs, dfs")
-
+    if method == "astar":  # Add this
+        return AStar()
+    raise SystemExit(f"Unknown method: {method!r}. Use one of: bfs, dfs, astar")
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MazeLLM: solve maze and visualize step-by-step.")
