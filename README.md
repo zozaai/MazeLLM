@@ -73,7 +73,8 @@ MazeLLM currently uses **Breadth-First Search (BFS)** to find the shortest path 
 Run the full demo with animation:
 
 ```bash
-python -m mazellm.main --r 8 --c 12 --interval 0.05 -m astar
-python -m mazellm.main --r 8 --c 12 --interval 0.05 -m bfs
-python -m mazellm.main --r 8 --c 12 --interval 0.05 -m dfs
+python -m mazellm.main --r 6 --c 6 --interval 0.5 -m llm --llm-model gpt-4o-mini
+python -m mazellm.main --r 6 --c 6 --interval 0.05 -m astar
+python -m mazellm.main --r 6 --c 6 --interval 0.05 -m bfs
+python -m mazellm.main --r 6 --c 6 --interval 0.05 -m dfs
 ```
