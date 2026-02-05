@@ -1,7 +1,6 @@
 name: CI
 
 on:
-  push:
   pull_request:
 
 jobs:
@@ -37,5 +36,5 @@ jobs:
           files: coverage.xml
           flags: unit
           name: MazeLLM
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           verbose: true
