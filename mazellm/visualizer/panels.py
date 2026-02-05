@@ -1,7 +1,7 @@
 # mazellm/visualizer/panels.py
 from __future__ import annotations
 
-import argparse
+import asyncio
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Static, Header, Footer
@@ -33,6 +33,7 @@ class MazePanel(App):
         self.robot_pos: tuple[int, int] | None = None  # (row, col)
         self.info_panel: Static | None = None
         self.logs: list[str] = [f"{self.rows}x{self.cols} maze"]
+        self.visited: set[tuple[int, int]] = set()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -81,7 +82,7 @@ class MazePanel(App):
                 cell = self.maze.board[r, c]
 
                 # Clear all known state classes (except base "tile")
-                for cls in ("start", "end", "wall", "free", "robot"):
+                for cls in ("start", "end", "wall", "free", "visited", "robot"):
                     self.tiles[idx].set_class(False, cls)
 
                 if cell == "S":
@@ -92,6 +93,10 @@ class MazePanel(App):
                     self.tiles[idx].set_class(True, "wall")
                 else:
                     self.tiles[idx].set_class(True, "free")
+
+                # visited overlay (don’t paint walls)
+                if (r, c) in self.visited and cell != 1:
+                    self.tiles[idx].set_class(True, "visited")
 
         # Re-apply robot highlight if set
         if self.robot_pos is not None:
@@ -115,3 +120,22 @@ class MazePanel(App):
         self.tiles[self._idx(row, col)].set_class(True, "robot")
         self.log_info(f"Current location ({row},{col})")
 
+
+    def mark_visited(self, cells: list[tuple[int, int]]) -> None:
+        """
+        cells: list of (row, col) visited in this step.
+        """
+        # downgrade previous visited to visited-old
+        for (r, c) in self.visited:
+            idx = self._idx(r, c)
+            self.tiles[idx].set_class(False, "visited")
+            self.tiles[idx].set_class(True, "visited-old")
+
+        # add new visited
+        for (r, c) in cells:
+            if 0 <= r < self.rows and 0 <= c < self.cols:
+                self.visited.add((r, c))
+                idx = self._idx(r, c)
+                self.tiles[idx].set_class(True, "visited")
+
+        self.render_maze()
