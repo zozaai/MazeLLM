@@ -21,7 +21,7 @@ class MazePanel(App):
     """
 
     CSS_PATH = Path(__file__).with_name("maze_visualizer.tcss")
-    BINDINGS = [("q", "quit", "Quit")]
+    BINDINGS = [("q", "quit", "Quit"), ("space", "toggle_pause", "Pause/Resume")]
 
     def __init__(self, maze: Maze, **kwargs):
         super().__init__(**kwargs)
@@ -34,6 +34,7 @@ class MazePanel(App):
         self.info_panel: Static | None = None
         self.logs: list[str] = [f"{self.rows}x{self.cols} maze"]
         self.visited: set[tuple[int, int]] = set()
+        self.paused: bool = False
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -59,6 +60,10 @@ class MazePanel(App):
 
     def action_quit(self) -> None:
         self.exit()
+
+    def action_toggle_pause(self) -> None:
+        self.paused = not self.paused
+        self.log_info("⏸ Paused" if self.paused else "▶ Resumed")
 
     def log_info(self, message: str) -> None:
         self.logs.append(message)
