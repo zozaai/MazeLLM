@@ -66,6 +66,9 @@ class SolveMazePanel(MazePanel):
         self.set_interval(self.interval_s, self._tick)
 
     def _tick(self) -> None:
+        if self.paused:
+            return
+        
         if self._step_i >= len(self.path) - 1:
             self.log_info("✅ Reached end.")
             return
@@ -122,6 +125,10 @@ class LLMSolveMazePanel(MazePanel):
         import traceback
 
         while not self._stop:
+            if self.paused:
+                await asyncio.sleep(0.05)
+                continue
+            
             try:
                 self.log_info("⏱️ tick (runner loop)")
 
