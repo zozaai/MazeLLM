@@ -36,7 +36,9 @@ class LLMAgent:
     IMPORTANT:
     - Uses AsyncOpenAI to avoid blocking Textual loop.
     - OpenAI calls are wrapped in a timeout to avoid "stuck forever".
-    - Logs aggressively for debugging.
+    - Tool-calling protocol is STRICT:
+        assistant(with tool_calls) -> tool(...) -> assistant ...
+      So we ALWAYS append the assistant message (incl. tool_calls) before tool messages.
     """
 
     def __init__(
@@ -71,9 +73,32 @@ class LLMAgent:
         x, y = robot.position.x, robot.position.y
         return (0 <= y < maze.m) and (0 <= x < maze.n) and (maze.board[y, x] == "E")
 
+    def _local_memory_view(self, maze: Maze, robot: Robot, radius: int = 3) -> List[str]:
+        rx, ry = robot.position.x, robot.position.y
+        lines: List[str] = []
+        for y in range(ry - radius, ry + radius + 1):
+            row = []
+            for x in range(rx - radius, rx + radius + 1):
+                if not (0 <= x < maze.n and 0 <= y < maze.m):
+                    row.append(" ")
+                    continue
+                if (x, y) == (rx, ry):
+                    row.append("R")
+                    continue
+                v = maze.board[y, x]
+                if v == 1:
+                    row.append("#")
+                elif v == "E":
+                    row.append("E")
+                else:
+                    row.append("v" if (x, y) in self.visited else ".")
+            lines.append("".join(row))
+        return lines
+
     def _state_dict(self, maze: Maze, robot: Robot) -> Dict[str, Any]:
         pos = {"x": robot.position.x, "y": robot.position.y}
         done = self._at_goal(maze, robot)
+
         last_moves = [
             {
                 "i": m.i,
@@ -94,10 +119,7 @@ class LLMAgent:
             "visited_count": len(self.visited),
             "last_sensor": self.last_sensor,
             "last_moves": last_moves,
-            "limits": {
-                "step_i": self.step_i,
-                "max_total_steps": self.max_total_steps,
-            },
+            "limits": {"step_i": self.step_i, "max_total_steps": self.max_total_steps},
             "memory_view_7x7": mem_view,
         }
 
@@ -126,6 +148,25 @@ class LLMAgent:
         if cells[-1] != (to_pos.x, to_pos.y):
             cells[-1] = (to_pos.x, to_pos.y)
         return cells
+
+    def _tool_calls_to_dicts(self, tool_calls: Any) -> List[Dict[str, Any]]:
+        """
+        Convert SDK tool_call objects into plain dicts acceptable in `messages`.
+        """
+        out: List[Dict[str, Any]] = []
+        for tc in (tool_calls or []):
+            # tc.id, tc.type, tc.function.name, tc.function.arguments
+            out.append(
+                {
+                    "id": getattr(tc, "id", None),
+                    "type": getattr(tc, "type", "function"),
+                    "function": {
+                        "name": getattr(getattr(tc, "function", None), "name", None),
+                        "arguments": getattr(getattr(tc, "function", None), "arguments", "{}") or "{}",
+                    },
+                }
+            )
+        return out
 
     # -------------------------
     # Tools exposed to the LLM
@@ -241,11 +282,7 @@ class LLMAgent:
             "Stop after one successful move.\n"
         )
 
-        user = (
-            "Current state JSON:\n"
-            f"{state_json}\n\n"
-            "Make progress. Use tools only."
-        )
+        user = "Current state JSON:\n" f"{state_json}\n\n" "Make progress. Use tools only."
 
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": system},
@@ -312,15 +349,28 @@ class LLMAgent:
             log(f"🌐 OpenAI response received in {dt:.2f}s")
 
             msg = resp.choices[0].message
-            tool_calls = getattr(msg, "tool_calls", None)
-            content = (msg.content or "").strip()
+            tool_calls_obj = getattr(msg, "tool_calls", None)
+            tool_calls = list(tool_calls_obj or [])
 
+            content = (msg.content or "").strip()
             log(f"🧠 LLM content (first 200): {content[:200]!r}")
-            log(f"🧰 tool_calls: {0 if not tool_calls else len(tool_calls)}")
+            log(f"🧰 tool_calls: {len(tool_calls)}")
+
+            # IMPORTANT: append assistant message BEFORE any tool messages
+            # This is required by the Chat Completions tool protocol.
+            assistant_entry: Dict[str, Any] = {"role": "assistant", "content": msg.content}
+            if tool_calls:
+                assistant_entry["tool_calls"] = self._tool_calls_to_dicts(tool_calls_obj)
+            messages.append(assistant_entry)
 
             if not tool_calls:
                 log("⚠️ No tool calls returned. Ending this tick.")
-                break
+                return {
+                    "did_move": False,
+                    "done": self._at_goal(maze, robot),
+                    "visited_added_rc": [],
+                    "log_lines": log_lines,
+                }
 
             for tc in tool_calls:
                 fn = tc.function.name
@@ -353,7 +403,6 @@ class LLMAgent:
                             steps_int = int(steps)
                         except Exception:
                             steps_int = -1
-
                         out = self.tool_move(maze, robot, direction=direction, steps=steps_int)
                         log(f"↩️ move -> {out}")
 
@@ -361,6 +410,14 @@ class LLMAgent:
                     if out.get("status") is True:
                         visited_added_rc = [(v["y"], v["x"]) for v in out.get("visited_added", [])]
                         self.step_i += 1
+                        # Append tool response for completeness even if we return immediately
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tc.id,
+                                "content": json.dumps(out, ensure_ascii=False),
+                            }
+                        )
                         return {
                             "did_move": True,
                             "done": bool(out.get("done")),
@@ -372,6 +429,7 @@ class LLMAgent:
                     out = {"status": False, "error": f"Unknown tool: {fn}"}
                     log(f"↩️ {out}")
 
+                # Append tool response (LEGAL because we appended assistant message with tool_calls above)
                 messages.append(
                     {
                         "role": "tool",
@@ -380,28 +438,6 @@ class LLMAgent:
                     }
                 )
 
-        # No successful move this tick
+        # No successful move this turn
         self.step_i += 1
         return {"did_move": False, "done": self._at_goal(maze, robot), "visited_added_rc": [], "log_lines": log_lines}
-
-    def _local_memory_view(self, maze: Maze, robot: Robot, radius: int = 3) -> List[str]:
-        rx, ry = robot.position.x, robot.position.y
-        lines: List[str] = []
-        for y in range(ry - radius, ry + radius + 1):
-            row = []
-            for x in range(rx - radius, rx + radius + 1):
-                if not (0 <= x < maze.n and 0 <= y < maze.m):
-                    row.append(" ")
-                    continue
-                if (x, y) == (rx, ry):
-                    row.append("R")
-                    continue
-                v = maze.board[y, x]
-                if v == 1:
-                    row.append("#")
-                elif v == "E":
-                    row.append("E")
-                else:
-                    row.append("v" if (x, y) in self.visited else ".")
-            lines.append("".join(row))
-        return lines
