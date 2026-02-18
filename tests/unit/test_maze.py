@@ -4,15 +4,6 @@ from collections import deque
 from mazellm.maze import Maze
 
 
-def _find_cell(board: np.ndarray, value: object) -> tuple[int, int]:
-    """Return (row, col) for the first matching value."""
-    for r in range(board.shape[0]):
-        for c in range(board.shape[1]):
-            if board[r, c] == value:
-                return r, c
-    raise AssertionError(f"Cell {value!r} not found in board.")
-
-
 def _is_walkable(v: object) -> bool:
     # In this project, 1 is a wall; everything else is walkable (0, "S", "E")
     return v != 1
@@ -59,7 +50,7 @@ def test_generate_maze_places_start_and_end_and_end_is_reachable():
     assert maze.board[0, 0] == "S"
 
     # End can be anywhere now, but must exist exactly once
-    end_r, end_c = _find_cell(maze.board, "E")
+    end_r, end_c = maze.find_cell(maze.board, "E")
 
     # E should be on a walkable cell (obvious, but makes intent explicit)
     assert maze.board[end_r, end_c] == "E"

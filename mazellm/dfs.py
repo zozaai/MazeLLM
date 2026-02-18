@@ -2,27 +2,48 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Optional
 
 from mazellm.maze import Maze
-from mazellm.robot import Position
+from mazellm.solver import Solver, StepResult
+from mazellm.robot import Robot
+from mazellm.types import Position, Direction
+
+
+def _neighbors4(x: int, y: int) -> Iterable[tuple[int, int]]:
+    # keep consistent order for deterministic style
+    yield (x + 1, y)
+    yield (x - 1, y)
+    yield (x, y + 1)
+    yield (x, y - 1)
+
+
+def _step_to_move(a: Position, b: Position) -> dict[Direction, int]:
+    dx = b.x - a.x
+    dy = b.y - a.y
+    if dx == 1 and dy == 0:
+        return {"right": 1}
+    if dx == -1 and dy == 0:
+        return {"left": 1}
+    if dx == 0 and dy == 1:
+        return {"down": 1}
+    if dx == 0 and dy == -1:
+        return {"up": 1}
+    raise ValueError(f"Non-adjacent step: {a} -> {b}")
 
 
 @dataclass
-class DFS:
+class DFSSolver(Solver):
     """
-    Depth-First Search path finder.
-    Returns *a* valid path (not guaranteed shortest).
+    DFS solver: returns *a* valid path (not shortest), then yields 1 move per tick.
     """
 
-    def _neighbors(self, x: int, y: int) -> Iterable[tuple[int, int]]:
-        # order matters for "style" of DFS path; keep consistent
-        yield (x + 1, y)
-        yield (x - 1, y)
-        yield (x, y + 1)
-        yield (x, y - 1)
+    def __init__(self):
+        super().__init__(name="dfs")
+        self._path: Optional[list[Position]] = None
+        self._i: int = 0
 
-    def solve(self, maze: Maze, start: Position, end: Position) -> list[Position]:
+    def _solve_path(self, maze: Maze, start: Position, end: Position) -> list[Position]:
         stack: list[tuple[int, int]] = [(start.x, start.y)]
         parent: dict[tuple[int, int], tuple[int, int] | None] = {(start.x, start.y): None}
 
@@ -31,26 +52,75 @@ class DFS:
             if (x, y) == (end.x, end.y):
                 break
 
-            for nx, ny in self._neighbors(x, y):
+            for nx, ny in _neighbors4(x, y):
                 if not (0 <= nx < maze.n and 0 <= ny < maze.m):
                     continue
-                if maze.is_barrier(x=nx, y=ny):
+                if maze.is_barrier(nx, ny):
                     continue
                 if (nx, ny) in parent:
                     continue
-
                 parent[(nx, ny)] = (x, y)
                 stack.append((nx, ny))
 
         if (end.x, end.y) not in parent:
             raise RuntimeError("No path found from S to E (maze may be disconnected).")
 
-        # Reconstruct
         path_xy: list[tuple[int, int]] = []
         cur: tuple[int, int] | None = (end.x, end.y)
         while cur is not None:
             path_xy.append(cur)
             cur = parent[cur]
         path_xy.reverse()
-
         return [Position(x=x, y=y) for x, y in path_xy]
+
+    def _ensure_path(self, maze: Maze, robot: Robot) -> None:
+        if self._path is not None:
+            return
+        start = maze.find_cell("S")
+        end = maze.find_cell("E")
+        self._path = self._solve_path(maze, start, end)
+        self._i = 0
+        self.visited.add((robot.position.y, robot.position.x))
+
+    async def next(self, *, maze: Maze, robot: Robot, logger=None) -> StepResult:
+        self._ensure_path(maze, robot)
+
+        if maze.board[robot.position.y, robot.position.x] == "E":
+            return StepResult(did_move=False, done=True, message="✅ Already at goal.")
+
+        assert self._path is not None
+
+        if self._i < len(self._path) and self._path[self._i] != robot.position:
+            try:
+                self._i = self._path.index(robot.position)
+            except ValueError:
+                return StepResult(did_move=False, done=False, message="⚠️ Robot is off the DFS path.")
+
+        if self._i >= len(self._path) - 1:
+            return StepResult(did_move=False, done=True, message="✅ Reached end.")
+
+        cur = self._path[self._i]
+        nxt = self._path[self._i + 1]
+        move_cmd = _step_to_move(cur, nxt)
+
+        res = robot.move(move_cmd)
+        if not res["status"]:
+            return StepResult(did_move=False, done=False, message=f"❌ Move failed: {move_cmd}")
+
+        self._i += 1
+        rp = robot.position
+        rc = (rp.y, rp.x)
+        added = []
+        if rc not in self.visited:
+            self.visited.add(rc)
+            added.append(rc)
+
+        done = maze.board[rp.y, rp.x] == "E"
+        dir_name, cells = next(iter(move_cmd.items()))
+        return StepResult(
+            did_move=True,
+            done=done,
+            message=f"Move: {dir_name} {cells} -> (x={rp.x}, y={rp.y})",
+            visited_added_rc=added,
+            new_position=rp,
+        )

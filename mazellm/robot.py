@@ -1,19 +1,10 @@
 # mazellm/robot.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Literal, TypedDict
+from typing import Dict, TypedDict
 
 from mazellm.maze import Maze
-
-
-Direction = Literal["up", "down", "left", "right"]
-
-
-@dataclass
-class Position:
-    x: int
-    y: int
+from mazellm.types import Direction, Position  # ✅ moved here
 
 
 class MoveResult(TypedDict):
@@ -36,32 +27,16 @@ class Robot:
         self.maze: Maze = maze
         self.position: Position = position or Position(x=0, y=0)
 
-    # --------------------------
-    # Helpers
-    # --------------------------
     def _in_bounds(self, x: int, y: int) -> bool:
         return 0 <= x < self.maze.n and 0 <= y < self.maze.m
 
     def _is_walkable(self, x: int, y: int) -> bool:
-        """Walkable means: inside bounds and NOT a barrier (1)."""
         return self._in_bounds(x, y) and (not self.maze.is_barrier(x=x, y=y))
 
-    # --------------------------
-    # Public API
-    # --------------------------
     def sensor(self) -> Dict[Direction, int]:
-        """
-        Return how many cells the robot can move (max) in each direction
-        before hitting a wall/barrier or the maze boundary.
-
-        Example:
-          {"up": 0, "down": 3, "left": 1, "right": 7}
-        """
         x, y = self.position.x, self.position.y
-
         distances: Dict[Direction, int] = {"up": 0, "down": 0, "left": 0, "right": 0}
 
-        # Up: decreasing y
         steps = 0
         yy = y - 1
         while yy >= 0 and self._is_walkable(x, yy):
@@ -69,7 +44,6 @@ class Robot:
             yy -= 1
         distances["up"] = steps
 
-        # Down: increasing y
         steps = 0
         yy = y + 1
         while yy < self.maze.m and self._is_walkable(x, yy):
@@ -77,7 +51,6 @@ class Robot:
             yy += 1
         distances["down"] = steps
 
-        # Left: decreasing x
         steps = 0
         xx = x - 1
         while xx >= 0 and self._is_walkable(xx, y):
@@ -85,7 +58,6 @@ class Robot:
             xx -= 1
         distances["left"] = steps
 
-        # Right: increasing x
         steps = 0
         xx = x + 1
         while xx < self.maze.n and self._is_walkable(xx, y):
@@ -96,21 +68,6 @@ class Robot:
         return distances
 
     def move(self, direction: Dict[Direction, int]) -> MoveResult:
-        """
-        Attempt to move the robot in a given direction for N cells.
-
-        Input example:
-          {"left": 3}
-          {"down": 1}
-
-        Rules:
-        - You can move only through walkable cells (maze.is_barrier == False).
-        - If any intermediate cell is blocked OR out of bounds -> fail, no movement.
-        - On success, updates robot.position and returns the new Position.
-
-        Returns:
-          {"status": True/False, "new_position": Position(...)}
-        """
         if not direction:
             return {"status": False, "new_position": Position(self.position.x, self.position.y)}
 
@@ -122,7 +79,6 @@ class Robot:
         if not isinstance(cells, int) or cells < 0:
             return {"status": False, "new_position": Position(self.position.x, self.position.y)}
 
-        # No-op
         if cells == 0:
             return {"status": True, "new_position": Position(self.position.x, self.position.y)}
 
@@ -136,7 +92,7 @@ class Robot:
                 y += 1
             elif dir_name == "left":
                 x -= 1
-            else:  # right
+            else:
                 x += 1
 
             if not self._is_walkable(x, y):
@@ -144,4 +100,3 @@ class Robot:
 
         self.position = Position(x=x, y=y)
         return {"status": True, "new_position": Position(x=x, y=y)}
-

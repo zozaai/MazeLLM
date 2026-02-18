@@ -1,27 +1,19 @@
 # mazellm/maze.py
-import argparse
+from __future__ import annotations
+
 import random
 from collections import deque
 from typing import Iterable
 
 import numpy as np
 
-"""
-# default 5x5
-python -m mazellm.maze
-
-# rectangular maze
-python -m mazellm.maze -c 8 -r 4
-
-# reproducible maze
-python -m mazellm.maze -c 10 -r 10 --seed 123
-"""
+from mazellm.types import Position  # ✅ from types now
 
 
 class Maze:
     def __init__(self, cols: int = 5, rows: int = 5, seed: int | None = None):
-        self.n = cols  # Internally still n for x/columns
-        self.m = rows  # Internally still m for y/rows
+        self.n = cols
+        self.m = rows
         self.board = np.ones((self.m, self.n), dtype=object)
         self._rng = random.Random(seed)
 
@@ -35,11 +27,9 @@ class Maze:
         return v == 1
 
     def _is_walkable_value(self, v: object) -> bool:
-        # Everything except wall counts as walkable (0, "S", "E")
         return not self._is_wall_value(v)
 
     def _bfs_distances_from(self, sx: int, sy: int) -> dict[tuple[int, int], int]:
-        """Return distances to all reachable walkable cells from (sx, sy)."""
         if not (0 <= sx < self.n and 0 <= sy < self.m):
             return {}
         if not self._is_walkable_value(self.board[sy, sx]):
@@ -63,7 +53,6 @@ class Maze:
         return dist
 
     def generate_maze(self) -> None:
-        # reset board
         self.board[:, :] = 1
 
         def carve(x: int, y: int) -> None:
@@ -77,21 +66,15 @@ class Maze:
                     self.board[y + dy // 2, x + dx // 2] = 0
                     carve(nx, ny)
 
-        # Ensure start cell is carved
         carve(0, 0)
 
-        # Compute reachable set from start over walkable cells
         dist = self._bfs_distances_from(0, 0)
         if not dist:
-            # Extremely defensive; should not happen because carve(0,0) sets it to 0
             self.board[0, 0] = 0
             dist = self._bfs_distances_from(0, 0)
 
-        # Pick the farthest reachable cell as the end
         (ex, ey), _ = max(dist.items(), key=lambda kv: kv[1])
 
-        # Place Start and End (clear previous markings just in case)
-        # Remove any stale S/E if regenerate is called multiple times
         for y in range(self.m):
             for x in range(self.n):
                 if self.board[y, x] in ("S", "E"):
@@ -105,3 +88,10 @@ class Maze:
             return self.board[y, x] == 1
         return True
 
+    # ✅ NEW
+    def find_cell(self, value: object) -> Position:
+        for y in range(self.m):
+            for x in range(self.n):
+                if self.board[y, x] == value:
+                    return Position(x=x, y=y)
+        raise ValueError(f"Could not find {value!r} in maze.board")

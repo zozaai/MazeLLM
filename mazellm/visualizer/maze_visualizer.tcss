@@ -29,7 +29,6 @@
     align: center middle;
 }
 
-
 /* ===== Maze board ===== */
 #chess-board {
     layout: grid;
@@ -38,25 +37,26 @@
     height: 30;
 }
 
-/* Make tiles actually occupy space */
 #chess-board > .tile {
     width: 1fr;
     height: 1fr;
-    background: white; /* default so you SEE something */
+    background: white;
 }
 
-/* ===== Maze board ===== */
 #chess-board > .tile.free  { background: white; }
 #chess-board > .tile.wall  { background: black; }
 #chess-board > .tile.start { background: green; }
 #chess-board > .tile.end   { background: blue; }
 
-/* 🔥 Visited trajectory (very visible) */
 #chess-board > .tile.visited {
-    background: #ffcc66;   /* warm yellow/orange */
+    background: #ffcc66;
 }
 
-/* 🤖 Robot (always on top) */
+/* NEW: older visited trail */
+#chess-board > .tile.visited-old {
+    background: #ffe6b3;
+}
+
 #chess-board > .tile.robot {
-    background: #ff3333;   /* strong red */
+    background: #ff3333;
 }
