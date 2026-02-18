@@ -50,7 +50,8 @@ def test_generate_maze_places_start_and_end_and_end_is_reachable():
     assert maze.board[0, 0] == "S"
 
     # End can be anywhere now, but must exist exactly once
-    end_r, end_c = maze.find_cell(maze.board, "E")
+    end_pos = maze.find_cell("E")
+    end_r, end_c = end_pos.y, end_pos.x
 
     # E should be on a walkable cell (obvious, but makes intent explicit)
     assert maze.board[end_r, end_c] == "E"
