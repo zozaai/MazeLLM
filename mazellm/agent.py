@@ -13,7 +13,9 @@ from typing import Any, Dict, List, Optional
 from openai import AsyncOpenAI
 
 from mazellm.maze import Maze
-from mazellm.robot import Robot, Direction, Position
+from mazellm.solver import Solver, StepResult
+from mazellm.robot import Robot
+from mazellm.types import Position, Direction
 
 
 @dataclass
@@ -26,19 +28,13 @@ class MoveRecord:
     ok: bool
 
 
-class LLMAgent:
+class LLMSolver(Solver):
     """
-    LLM-driven agent that can:
-      - sense() using Robot.sensor()
-      - move(direction, steps) using Robot.move()
-      - get_state()
+    LLM-driven solver that performs ONE successful move per tick.
 
-    IMPORTANT:
-    - Uses AsyncOpenAI to avoid blocking Textual loop.
-    - OpenAI calls are wrapped in a timeout to avoid "stuck forever".
-    - Tool-calling protocol is STRICT:
-        assistant(with tool_calls) -> tool(...) -> assistant ...
-      So we ALWAYS append the assistant message (incl. tool_calls) before tool messages.
+    - Still uses tool-calling (sense/move/get_state).
+    - Internally applies the move on the robot (consistent with Solver.next contract).
+    - Updates self.visited and returns visited_added_rc.
     """
 
     def __init__(
@@ -50,6 +46,7 @@ class LLMAgent:
         request_timeout_s: float = 20.0,
         also_print: bool = True,
     ):
+        super().__init__(name="llm")
         self.model = model
         self.max_total_steps = int(max_total_steps)
         self.max_tool_calls_per_turn = int(max_tool_calls_per_turn)
@@ -62,7 +59,6 @@ class LLMAgent:
         self.client = AsyncOpenAI()
 
         self.step_i = 0
-        self.visited: set[tuple[int, int]] = set()  # (x,y)
         self.moves: List[MoveRecord] = []
         self.last_sensor: Optional[Dict[Direction, int]] = None
 
@@ -91,7 +87,7 @@ class LLMAgent:
                 elif v == "E":
                     row.append("E")
                 else:
-                    row.append("v" if (x, y) in self.visited else ".")
+                    row.append("v" if (y, x) in self.visited else ".")
             lines.append("".join(row))
         return lines
 
@@ -150,12 +146,8 @@ class LLMAgent:
         return cells
 
     def _tool_calls_to_dicts(self, tool_calls: Any) -> List[Dict[str, Any]]:
-        """
-        Convert SDK tool_call objects into plain dicts acceptable in `messages`.
-        """
         out: List[Dict[str, Any]] = []
         for tc in (tool_calls or []):
-            # tc.id, tc.type, tc.function.name, tc.function.arguments
             out.append(
                 {
                     "id": getattr(tc, "id", None),
@@ -169,7 +161,7 @@ class LLMAgent:
         return out
 
     # -------------------------
-    # Tools exposed to the LLM
+    # Tools
     # -------------------------
     def tool_sense(self, maze: Maze, robot: Robot) -> Dict[str, Any]:
         sensor = robot.sensor()
@@ -178,7 +170,6 @@ class LLMAgent:
         return {"position": pos, "sensor": sensor}
 
     def tool_move(self, maze: Maze, robot: Robot, direction: Direction, steps: int) -> Dict[str, Any]:
-        # Validate using current sensor so model can't hang by repeatedly doing impossible moves
         if self.last_sensor is None:
             self.last_sensor = robot.sensor()
 
@@ -219,8 +210,9 @@ class LLMAgent:
         visited_added_xy: List[tuple[int, int]] = []
         if ok:
             visited_added_xy = self._visited_cells_for_success_move(from_pos, direction, int(steps), to_pos)
+            # store as (row, col)
             for (x, y) in visited_added_xy:
-                self.visited.add((x, y))
+                self.visited.add((y, x))
 
         return {
             "status": ok,
@@ -234,15 +226,9 @@ class LLMAgent:
         return self._state_dict(maze, robot)
 
     # -------------------------
-    # Main decision loop
+    # Solver API
     # -------------------------
-    async def run_until_move_or_done(
-        self,
-        maze: Maze,
-        robot: Robot,
-        *,
-        logger: Optional[Callable[[str], None]] = None,
-    ) -> Dict[str, Any]:
+    async def next(self, *, maze: Maze, robot: Robot, logger: Optional[Callable[[str], None]] = None) -> StepResult:
         log_lines: List[str] = []
 
         def log(s: str) -> None:
@@ -252,20 +238,20 @@ class LLMAgent:
             if self.also_print:
                 print(s, flush=True)
 
+        # Ensure start cell registered
+        self.visited.add((robot.position.y, robot.position.x))
+
         if self._at_goal(maze, robot):
-            log("✅ Already at goal.")
-            return {"did_move": False, "done": True, "visited_added_rc": [], "log_lines": log_lines}
+            return StepResult(did_move=False, done=True, message="✅ Already at goal.", new_position=robot.position)
 
         if self.step_i >= self.max_total_steps:
-            log("⚠️ Reached max_total_steps. Stopping.")
-            return {"did_move": False, "done": False, "visited_added_rc": [], "log_lines": log_lines}
+            return StepResult(did_move=False, done=False, message="⚠️ Reached max_total_steps. Stopping.", new_position=robot.position)
 
-        # Always start with a sensor read (keeps last_sensor fresh + gives model a stable state)
+        # Always sense first
         s0 = self.tool_sense(maze, robot)
         log(f"🧭 pre-sense -> {s0}")
 
-        state = self._state_dict(maze, robot)
-        state_json = json.dumps(state, ensure_ascii=False)
+        state_json = json.dumps(self._state_dict(maze, robot), ensure_ascii=False)
 
         system = (
             "You are controlling a robot in a maze.\n"
@@ -278,8 +264,7 @@ class LLMAgent:
             "- Prefer unvisited paths when possible.\n"
             "- Avoid moving to cells marked visited (v) unless you have no other valid option.\n"
             "- Prefer moves that lead to NEW cells.\n"
-            "- If you return immediately to the previous cell, that is usually bad.\n"
-            "Stop after one successful move.\n"
+            "- Stop after one successful move.\n"
         )
 
         user = "Current state JSON:\n" f"{state_json}\n\n" "Make progress. Use tools only."
@@ -323,8 +308,6 @@ class LLMAgent:
             },
         ]
 
-        visited_added_rc: List[tuple[int, int]] = []
-
         for tool_call_i in range(self.max_tool_calls_per_turn):
             log(f"🌐 OpenAI request start (i={tool_call_i}, model={self.model}, timeout={self.request_timeout_s}s)")
             t0 = time.time()
@@ -338,12 +321,11 @@ class LLMAgent:
                 )
                 resp = await asyncio.wait_for(coro, timeout=self.request_timeout_s)
             except asyncio.TimeoutError:
-                log("💥 OpenAI call TIMEOUT.")
-                return {"did_move": False, "done": self._at_goal(maze, robot), "visited_added_rc": [], "log_lines": log_lines}
+                return StepResult(did_move=False, done=self._at_goal(maze, robot), message="💥 OpenAI call TIMEOUT.", new_position=robot.position)
             except Exception as e:
                 log(f"💥 OpenAI call FAILED: {type(e).__name__}: {e}")
                 log(traceback.format_exc())
-                return {"did_move": False, "done": self._at_goal(maze, robot), "visited_added_rc": [], "log_lines": log_lines}
+                return StepResult(did_move=False, done=self._at_goal(maze, robot), message="💥 OpenAI call FAILED.", new_position=robot.position)
 
             dt = time.time() - t0
             log(f"🌐 OpenAI response received in {dt:.2f}s")
@@ -352,84 +334,58 @@ class LLMAgent:
             tool_calls_obj = getattr(msg, "tool_calls", None)
             tool_calls = list(tool_calls_obj or [])
 
-            content = (msg.content or "").strip()
-            log(f"🧠 LLM content (first 200): {content[:200]!r}")
-            log(f"🧰 tool_calls: {len(tool_calls)}")
-
-            # IMPORTANT: append assistant message BEFORE any tool messages
-            # This is required by the Chat Completions tool protocol.
+            # append assistant message BEFORE tool msgs (protocol)
             assistant_entry: Dict[str, Any] = {"role": "assistant", "content": msg.content}
             if tool_calls:
                 assistant_entry["tool_calls"] = self._tool_calls_to_dicts(tool_calls_obj)
             messages.append(assistant_entry)
 
             if not tool_calls:
-                log("⚠️ No tool calls returned. Ending this tick.")
-                return {
-                    "did_move": False,
-                    "done": self._at_goal(maze, robot),
-                    "visited_added_rc": [],
-                    "log_lines": log_lines,
-                }
+                return StepResult(did_move=False, done=self._at_goal(maze, robot), message="⚠️ No tool calls returned.", new_position=robot.position)
 
             for tc in tool_calls:
                 fn = tc.function.name
                 args_str = tc.function.arguments or "{}"
-                log(f"🔧 tool_call raw: {fn}({args_str})")
 
                 try:
                     args = json.loads(args_str)
                 except Exception:
-                    log("💥 Failed to json.loads(tool arguments). Using empty args.")
                     args = {}
 
                 if fn == "sense":
                     out = self.tool_sense(maze, robot)
-                    log(f"↩️ sense -> {out}")
 
                 elif fn == "get_state":
                     out = self.tool_get_state(maze, robot)
-                    log(f"↩️ get_state -> {out}")
 
                 elif fn == "move":
                     direction = args.get("direction")
                     steps = args.get("steps")
 
                     if direction not in ("up", "down", "left", "right"):
-                        out = {"status": False, "error": f"Invalid direction from LLM: {direction!r}"}
-                        log(f"↩️ move -> {out}")
+                        out = {"status": False, "error": f"Invalid direction: {direction!r}"}
                     else:
                         try:
                             steps_int = int(steps)
                         except Exception:
                             steps_int = -1
                         out = self.tool_move(maze, robot, direction=direction, steps=steps_int)
-                        log(f"↩️ move -> {out}")
 
-                    # Stop after first SUCCESSFUL move
                     if out.get("status") is True:
-                        visited_added_rc = [(v["y"], v["x"]) for v in out.get("visited_added", [])]
                         self.step_i += 1
-                        # Append tool response for completeness even if we return immediately
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": tc.id,
-                                "content": json.dumps(out, ensure_ascii=False),
-                            }
+                        rp = robot.position
+                        visited_added_rc = [(v["y"], v["x"]) for v in out.get("visited_added", [])]
+                        return StepResult(
+                            did_move=True,
+                            done=bool(out.get("done")),
+                            message=f"LLM move -> {direction} {steps}",
+                            visited_added_rc=visited_added_rc,
+                            new_position=rp,
                         )
-                        return {
-                            "did_move": True,
-                            "done": bool(out.get("done")),
-                            "visited_added_rc": visited_added_rc,
-                            "log_lines": log_lines,
-                        }
 
                 else:
                     out = {"status": False, "error": f"Unknown tool: {fn}"}
-                    log(f"↩️ {out}")
 
-                # Append tool response (LEGAL because we appended assistant message with tool_calls above)
                 messages.append(
                     {
                         "role": "tool",
@@ -438,6 +394,5 @@ class LLMAgent:
                     }
                 )
 
-        # No successful move this turn
         self.step_i += 1
-        return {"did_move": False, "done": self._at_goal(maze, robot), "visited_added_rc": [], "log_lines": log_lines}
+        return StepResult(did_move=False, done=self._at_goal(maze, robot), message="⚠️ No successful move this tick.", new_position=robot.position)

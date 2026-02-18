@@ -2,7 +2,8 @@
 import numpy as np
 
 from mazellm.maze import Maze
-from mazellm.robot import Robot, Position
+from mazellm.robot import Robot
+from mazellm.types import Position
 
 
 def _make_sample_maze() -> Maze:
