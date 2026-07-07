@@ -34,9 +34,13 @@ live browser visualization of the solve happening step by step.
   optimal/ground-truth path lengths for comparison against the LLM agent.
   This is what lets us actually measure whether fine-tuning improves
   maze-solving performance, rather than judging it qualitatively.
-- **`backend/server.py`** — FastAPI app that runs the LLM agent loop and
-  streams each step (`sensed`, `reasoning`/tool calls, `action`,
-  `new_position`) to the browser over WebSocket.
+- **`backend/server.py`** — FastAPI app. `POST /maze/generate` builds a
+  random maze; `GET /llm/info` and `POST /llm/check` report and smoke-test
+  the configured provider; `GET /health` is a liveness probe. The solve
+  itself runs over the `/ws/solve` WebSocket: the server streams an `init`
+  event, then per LLM turn a `memory` event (the exact prompt fed to the
+  model that turn) followed by one `sense`/`move` event per tool call, and
+  finally a `done` (or `error`) event.
 - **`frontend/`** — vanilla HTML/CSS/JS. Renders the maze on a canvas,
   animates the robot's movement and fog-of-war reveal, and shows a live
   decision log next to the board.
@@ -50,8 +54,10 @@ pip install -e ".[dev]"
 uvicorn backend.server:app --reload
 ```
 
-Then open `frontend/index.html` in a browser (or serve it statically) and
-connect it to the running backend.
+Then open `frontend/index.html` in a browser (or serve it statically). It
+talks to `http://localhost:8000` by default; point it elsewhere with
+`?http=...&ws=...` query params. Use the **Generate** and **Solve** buttons
+to run a maze, or **Check connection** to verify the LLM is reachable.
 
 ## Switching LLM providers
 
