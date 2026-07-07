@@ -466,7 +466,8 @@ function connectAndSolve(maze) {
 
   socket.addEventListener("open", () => {
     socket.send(JSON.stringify({ maze, max_steps: MAX_STEPS, solver: selectedSolver }));
-    const solverLabel = selectedSolver === "llm" ? "LLM" : selectedSolver === "astar" ? "A*" : selectedSolver.toUpperCase();
+    const SOLVER_LABELS = { llm: "LLM", dstar_lite: "D* Lite" };
+    const solverLabel = SOLVER_LABELS[selectedSolver] || selectedSolver.toUpperCase();
     logMessage(`Connected — solving with ${solverLabel}…`, "system");
   });
 
