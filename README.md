@@ -47,7 +47,8 @@ happening step by step.
 - **`frontend/`** — vanilla HTML/CSS/JS. Renders the maze on a canvas,
   animates the robot's movement and fog-of-war reveal, shows a live decision
   log, and lets you pick the solver (LLM or D\* Lite) from a button group.
-- **`mazes/`** — hand-authored demo maze JSON files.
+- **`mazes/`** — a hand-authored demo maze (`sample_maze.json`), the default
+  when the client doesn't send its own generated layout.
 
 ## Setup
 
@@ -89,9 +90,12 @@ be dumped as expert trajectories for supervised finetuning.
 ## Running tests
 
 ```bash
-pytest             # excludes tests marked `integration` by default
-pytest -m integration   # requires a real OPENAI_API_KEY / provider access
+pytest
 ```
+
+Tests are offline and deterministic — they cover maze generation, the maze
+model, and the LLM agent loop (driven by a scripted fake LLM client, no
+network), so no API key or provider access is needed.
 
 ## Status
 
