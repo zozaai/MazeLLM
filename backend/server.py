@@ -9,13 +9,16 @@ POST /maze/generate:
 
 Client protocol on /ws/solve:
   -> client sends {"maze": <maze dict from /maze/generate, or a filename
-     string under mazes/>, "max_steps": 100} immediately after connecting;
-     defaults to sample_maze.json if nothing is sent.
+     string under mazes/>, "max_steps": 100, "solver": "llm"} immediately
+     after connecting; defaults to sample_maze.json and the LLM solver if
+     nothing is sent. "solver" selects the strategy: "llm" (tool-use agent) or
+     any classical baseline in baseline_agent.SOLVERS (currently "astar").
   <- server sends one {"type": "init", width, height, walls, start, end}
-     event, then per LLM turn a {"type": "memory", "content": "..."} event
-     (exactly what was fed to the LLM this turn) followed by one event per
-     tool call it made ({"type": "sense", ...} / {"type": "move", ...}),
-     then a final {"type": "done", ...} (or {"type": "error", ...} on failure).
+     event, then per turn a {"type": "memory", "content": "..."} event
+     (what the solver "knows" this turn) followed by one event per action it
+     took ({"type": "sense", ...} / {"type": "move", ...}), then a final
+     {"type": "done", ...} (or {"type": "error", ...} on failure). Baseline
+     solvers emit only "memory" (once) and "move" events.
 """
 from pathlib import Path
 
@@ -26,6 +29,7 @@ from pydantic import BaseModel, Field
 from .agent.llm_agent import MazeSolvingAgent
 from .agent.llm_client import LLMClient
 from .agent.tools import TOOL_SCHEMAS
+from .baseline_agent import SOLVERS as BASELINE_SOLVERS, BaselineSolvingAgent
 from .config import load_settings
 from .maze.generator import generate_random_maze
 from .maze.maze import Maze
@@ -105,6 +109,7 @@ async def solve(websocket: WebSocket) -> None:
         pass  # no config sent — fall back to defaults
 
     max_steps = int(params.get("max_steps", 100))
+    solver = str(params.get("solver", "llm")).lower()
 
     try:
         maze = _load_maze(params.get("maze", "sample_maze.json"))
@@ -114,12 +119,15 @@ async def solve(websocket: WebSocket) -> None:
         return
 
     robot = Robot(position=maze.start)
-    llm_client = LLMClient(settings)
-    agent = MazeSolvingAgent(maze, robot, llm_client, max_steps=max_steps)
+    if solver in BASELINE_SOLVERS:
+        agent = BaselineSolvingAgent(maze, robot, solver, max_steps=max_steps)
+    else:  # default: LLM tool-use agent (also covers an unknown/omitted solver)
+        llm_client = LLMClient(settings)
+        agent = MazeSolvingAgent(maze, robot, llm_client, max_steps=max_steps)
 
     await websocket.send_json({"type": "init", **maze.to_dict()})
 
-    max_turns = max_steps * 5  # backstop against the LLM stalling without ever completing a move
+    max_turns = max_steps * 5  # backstop against a solver stalling without ever completing a move
     turns = 0
     try:
         while not agent.is_done() and turns < max_turns:

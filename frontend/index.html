@@ -23,6 +23,11 @@
     <div class="toolbar">
       <label>Rows <input id="rows-input" type="number" min="2" max="30" value="4" /></label>
       <label>Columns <input id="cols-input" type="number" min="2" max="30" value="4" /></label>
+      <div id="solver-group" class="solver-group" role="group" aria-label="Solver method">
+        <span class="solver-group-label">Solver</span>
+        <button type="button" class="solver-btn selected" data-solver="llm" aria-pressed="true">LLM</button>
+        <button type="button" class="solver-btn" data-solver="astar" aria-pressed="false">A*</button>
+      </div>
       <button id="generate-btn" type="button">Generate</button>
       <button id="solve-btn" type="button" disabled>Solve</button>
       <button id="stop-btn" type="button" disabled>Stop</button>

@@ -131,6 +131,51 @@ body {
 #stop-btn { background: #dc2626; }
 #check-conn-btn { background: #0f766e; }
 
+/* Inner box holding the selectable solver-method buttons */
+.solver-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--color-bg);
+}
+
+.solver-group-label {
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+}
+
+.solver-btn {
+  padding: 7px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--color-text-dim);
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.solver-btn:hover:not(.selected) {
+  color: var(--color-text);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.solver-btn.selected {
+  background: #4f46e5;
+  color: #fff;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.4);
+}
+
+.solver-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .board-area {
   background: var(--color-panel);
   border-radius: 12px;
