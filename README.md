@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="docs/architecture-hub-diagram.excalidraw">
-    <img src="docs/block-diagram.svg" alt="MazeLLM architecture diagram" width="70%" />
+    <img src="docs/maze-llm-robot-hub-diagram.excalidraw.svg" alt="MazeLLM architecture diagram" width="100%" />
   </a>
 </p>
 
