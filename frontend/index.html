@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Maze LLM Robot</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1>Maze LLM Robot</h1>
+      <div class="status">
+        <span id="status-text">Loading…</span>
+        <span id="step-count"></span>
+      </div>
+    </header>
+
+    <div class="llm-info">
+      LLM: <strong id="llm-provider">…</strong> / <strong id="llm-model">…</strong>
+      <span id="llm-check-result"></span>
+    </div>
+
+    <div class="toolbar">
+      <label>Rows <input id="rows-input" type="number" min="2" max="30" value="4" /></label>
+      <label>Columns <input id="cols-input" type="number" min="2" max="30" value="4" /></label>
+      <button id="generate-btn" type="button">Generate</button>
+      <button id="solve-btn" type="button" disabled>Solve</button>
+      <button id="stop-btn" type="button" disabled>Stop</button>
+      <button id="check-conn-btn" type="button">Check Connection</button>
+    </div>
+
+    <main class="board-area">
+      <div id="canvas-wrapper">
+        <canvas id="maze-canvas"></canvas>
+      </div>
+      <ul class="legend">
+        <li><span class="swatch swatch-start"></span> Start</li>
+        <li><span class="emoji">🏁</span> End</li>
+        <li><span class="emoji">🤖</span> Robot</li>
+        <li><span class="trail-swatch"></span> Path</li>
+        <li><span class="swatch swatch-wall"></span> Wall</li>
+        <li><span class="swatch swatch-wall-sensed"></span> Sensed wall</li>
+        <li><span class="swatch swatch-open"></span> Sensed open</li>
+        <li><span class="swatch swatch-unknown"></span> Unexplored</li>
+      </ul>
+    </main>
+
+    <aside id="decision-log">
+      <h2>Decision log</h2>
+      <ol id="log-entries"></ol>
+    </aside>
+
+    <aside id="history-panel">
+      <h2>LLM memory (this turn)</h2>
+      <pre id="memory-content">(not started)</pre>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

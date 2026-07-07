@@ -1,0 +1,32 @@
+[project]
+name = "mazellm"
+version = "0.2.0"
+description = "An LLM-controlled robot solves a maze it can only sense locally, visualized live in a browser — with classical BFS/DFS/A* baselines for comparison."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "websockets>=13.0",
+    "openai>=1.40",
+    "python-dotenv>=1.0",
+    "pydantic>=2.8",
+    "numpy>=1.26.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "integration: tests that call external services (OpenAI, network, etc.)",
+]
+addopts = "-m \"not integration\""
