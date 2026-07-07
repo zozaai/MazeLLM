@@ -16,7 +16,7 @@
     </header>
 
     <div class="llm-info">
-      LLM: <strong id="llm-provider">…</strong> / <strong id="llm-model">…</strong>
+      LLM: <strong id="llm-provider">…</strong> / <strong id="llm-base-url">…</strong> / <strong id="llm-model">…</strong>
       <span id="llm-check-result"></span>
     </div>
 
@@ -27,6 +27,8 @@
         <span class="solver-group-label">Solver</span>
         <button type="button" class="solver-btn selected" data-solver="llm" aria-pressed="true">LLM</button>
         <button type="button" class="solver-btn" data-solver="astar" aria-pressed="false">A*</button>
+        <button type="button" class="solver-btn" data-solver="bfs" aria-pressed="false">BFS</button>
+        <button type="button" class="solver-btn" data-solver="dfs" aria-pressed="false">DFS</button>
       </div>
       <button id="generate-btn" type="button">Generate</button>
       <button id="solve-btn" type="button" disabled>Solve</button>

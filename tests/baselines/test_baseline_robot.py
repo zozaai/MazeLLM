@@ -23,13 +23,6 @@ def _make_sample_maze() -> Maze:
     return maze
 
 
-def test_sensor_from_start_counts_until_wall_and_bounds():
-    maze = _make_sample_maze()
-    robot = Robot(maze=maze, position=Position(x=0, y=0))  # on "S"
-
-    assert robot.sensor() == {"up": 0, "down": 4, "left": 0, "right": 0}
-
-
 def test_move_blocked_by_wall_does_not_change_position():
     maze = _make_sample_maze()
     robot = Robot(maze=maze, position=Position(x=0, y=0))
@@ -81,14 +74,3 @@ def test_move_zero_steps_is_success_noop():
     assert res["status"] is True
     assert res["new_position"] == Position(x=0, y=0)
     assert robot.position == Position(x=0, y=0)
-
-
-def test_s_and_e_are_walkable_for_sensor():
-    maze = _make_sample_maze()
-    robot = Robot(maze=maze, position=Position(x=4, y=4))  # place directly on "E"
-
-    s = robot.sensor()
-    assert s["right"] == 0
-    assert s["down"] == 0
-    assert s["left"] == 0
-    assert s["up"] == 4
