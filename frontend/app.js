@@ -28,6 +28,9 @@ const generateBtn = document.getElementById("generate-btn");
 const solveBtn = document.getElementById("solve-btn");
 const stopBtn = document.getElementById("stop-btn");
 const checkConnBtn = document.getElementById("check-conn-btn");
+const solverGroup = document.getElementById("solver-group");
+const solverButtons = solverGroup ? Array.from(solverGroup.querySelectorAll(".solver-btn")) : [];
+let selectedSolver = "llm";
 const llmProviderEl = document.getElementById("llm-provider");
 const llmModelEl = document.getElementById("llm-model");
 const llmCheckResultEl = document.getElementById("llm-check-result");
@@ -140,6 +143,16 @@ function setControlsState() {
   solveBtn.disabled = solving || !currentMaze;
   stopBtn.disabled = !solving;
   checkConnBtn.disabled = solving || checkingConnection;
+  solverButtons.forEach((btn) => (btn.disabled = solving));
+}
+
+function selectSolver(solver) {
+  selectedSolver = solver;
+  solverButtons.forEach((btn) => {
+    const active = btn.dataset.solver === solver;
+    btn.classList.toggle("selected", active);
+    btn.setAttribute("aria-pressed", String(active));
+  });
 }
 
 function clearLog() {
@@ -451,8 +464,8 @@ function connectAndSolve(maze) {
   socket = new WebSocket(WS_URL);
 
   socket.addEventListener("open", () => {
-    socket.send(JSON.stringify({ maze, max_steps: MAX_STEPS }));
-    logMessage("Connected — solving…", "system");
+    socket.send(JSON.stringify({ maze, max_steps: MAX_STEPS, solver: selectedSolver }));
+    logMessage(`Connected — solving with ${selectedSolver === "astar" ? "A*" : "LLM"}…`, "system");
   });
 
   socket.addEventListener("message", (evt) => {
@@ -536,6 +549,11 @@ generateBtn.addEventListener("click", generateMaze);
 solveBtn.addEventListener("click", handleSolveClick);
 stopBtn.addEventListener("click", handleStopClick);
 checkConnBtn.addEventListener("click", handleCheckConnectionClick);
+solverButtons.forEach((btn) =>
+  btn.addEventListener("click", () => {
+    if (!solving) selectSolver(btn.dataset.solver);
+  })
+);
 window.addEventListener("resize", resizeCanvasToFit);
 
 requestAnimationFrame(tick);
