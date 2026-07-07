@@ -32,6 +32,7 @@ const solverGroup = document.getElementById("solver-group");
 const solverButtons = solverGroup ? Array.from(solverGroup.querySelectorAll(".solver-btn")) : [];
 let selectedSolver = "llm";
 const llmProviderEl = document.getElementById("llm-provider");
+const llmBaseUrlEl = document.getElementById("llm-base-url");
 const llmModelEl = document.getElementById("llm-model");
 const llmCheckResultEl = document.getElementById("llm-check-result");
 const memoryContentEl = document.getElementById("memory-content");
@@ -465,7 +466,8 @@ function connectAndSolve(maze) {
 
   socket.addEventListener("open", () => {
     socket.send(JSON.stringify({ maze, max_steps: MAX_STEPS, solver: selectedSolver }));
-    logMessage(`Connected — solving with ${selectedSolver === "astar" ? "A*" : "LLM"}…`, "system");
+    const solverLabel = selectedSolver === "llm" ? "LLM" : selectedSolver === "astar" ? "A*" : selectedSolver.toUpperCase();
+    logMessage(`Connected — solving with ${solverLabel}…`, "system");
   });
 
   socket.addEventListener("message", (evt) => {
@@ -511,9 +513,11 @@ async function loadLlmInfo() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const info = await res.json();
     llmProviderEl.textContent = info.provider;
+    llmBaseUrlEl.textContent = info.base_url;
     llmModelEl.textContent = info.model;
   } catch (err) {
     llmProviderEl.textContent = "unknown";
+    llmBaseUrlEl.textContent = "unknown";
     llmModelEl.textContent = "unknown";
   }
 }

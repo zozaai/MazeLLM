@@ -74,7 +74,7 @@ class BFSSolver(Solver):
         path_xy.reverse()
         return [Position(x=x, y=y) for x, y in path_xy]
 
-    def _ensure_path(self, maze: Maze, robot: Robot) -> None:
+    def _ensure_path(self, maze: Maze) -> None:
         if self._path is not None:
             return
 
@@ -83,11 +83,8 @@ class BFSSolver(Solver):
         self._path = self._solve_path(maze, start, end)
         self._i = 0
 
-        # include initial cell as visited
-        self.visited.add((robot.position.y, robot.position.x))
-
-    async def next(self, *, maze: Maze, robot: Robot, logger=None) -> StepResult:
-        self._ensure_path(maze, robot)
+    async def next(self, *, maze: Maze, robot: Robot) -> StepResult:
+        self._ensure_path(maze)
 
         # already at end?
         if maze.board[robot.position.y, robot.position.x] == "E":
@@ -116,18 +113,11 @@ class BFSSolver(Solver):
 
         self._i += 1
         rp = robot.position
-        rc = (rp.y, rp.x)
-        added = []
-        if rc not in self.visited:
-            self.visited.add(rc)
-            added.append(rc)
-
         done = maze.board[rp.y, rp.x] == "E"
         dir_name, cells = next(iter(move_cmd.items()))
         return StepResult(
             did_move=True,
             done=done,
             message=f"Move: {dir_name} {cells} -> (x={rp.x}, y={rp.y})",
-            visited_added_rc=added,
             new_position=rp,
         )

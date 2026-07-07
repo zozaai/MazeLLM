@@ -33,40 +33,6 @@ class Robot:
     def _is_walkable(self, x: int, y: int) -> bool:
         return self._in_bounds(x, y) and (not self.maze.is_barrier(x=x, y=y))
 
-    def sensor(self) -> Dict[Direction, int]:
-        x, y = self.position.x, self.position.y
-        distances: Dict[Direction, int] = {"up": 0, "down": 0, "left": 0, "right": 0}
-
-        steps = 0
-        yy = y - 1
-        while yy >= 0 and self._is_walkable(x, yy):
-            steps += 1
-            yy -= 1
-        distances["up"] = steps
-
-        steps = 0
-        yy = y + 1
-        while yy < self.maze.m and self._is_walkable(x, yy):
-            steps += 1
-            yy += 1
-        distances["down"] = steps
-
-        steps = 0
-        xx = x - 1
-        while xx >= 0 and self._is_walkable(xx, y):
-            steps += 1
-            xx -= 1
-        distances["left"] = steps
-
-        steps = 0
-        xx = x + 1
-        while xx < self.maze.n and self._is_walkable(xx, y):
-            steps += 1
-            xx += 1
-        distances["right"] = steps
-
-        return distances
-
     def move(self, direction: Dict[Direction, int]) -> MoveResult:
         if not direction:
             return {"status": False, "new_position": Position(self.position.x, self.position.y)}

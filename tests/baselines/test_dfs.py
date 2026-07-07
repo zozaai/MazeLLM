@@ -11,7 +11,7 @@ from backend.baselines.types import Position
 async def _run_solver_collect_positions(solver, maze: Maze, robot: Robot, max_ticks: int = 10_000):
     positions = [robot.position]
     for _ in range(max_ticks):
-        res = await solver.next(maze=maze, robot=robot, logger=None)
+        res = await solver.next(maze=maze, robot=robot)
         positions.append(robot.position)
         if res.done:
             break
@@ -85,4 +85,4 @@ async def test_dfs_unsolvable_raises():
     dfs = DFSSolver()
 
     with pytest.raises(RuntimeError, match="No path found"):
-        await dfs.next(maze=maze, robot=robot, logger=None)
+        await dfs.next(maze=maze, robot=robot)

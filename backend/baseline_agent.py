@@ -14,7 +14,7 @@ same loop and emit the exact same WebSocket step events the frontend animates.
 """
 from __future__ import annotations
 
-from backend.baselines import AStarSolver
+from backend.baselines import AStarSolver, BFSSolver, DFSSolver
 from backend.baselines.maze import Maze as BaselineMaze
 from backend.baselines.robot import Robot as BaselineRobot
 from backend.baselines.types import Position
@@ -22,9 +22,10 @@ from backend.baselines.types import Position
 from .maze.maze import Maze
 from .maze.robot import Robot
 
-# Solver name -> baseline Solver class. Only A* is exposed for now; BFS/DFS can
-# be added here later without touching server.py or the frontend contract.
-SOLVERS = {"astar": AStarSolver}
+# Solver name -> baseline Solver class. Adding a classical solver here is all it
+# takes to expose it over the WebSocket — server.py and the event contract are
+# registry-driven and need no changes (the frontend just needs a matching button).
+SOLVERS = {"astar": AStarSolver, "bfs": BFSSolver, "dfs": DFSSolver}
 
 _DELTA_TO_DIRECTION = {
     (0, -1): "up",
