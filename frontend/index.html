@@ -25,10 +25,8 @@
       <label>Columns <input id="cols-input" type="number" min="2" max="30" value="4" /></label>
       <div id="solver-group" class="solver-group" role="group" aria-label="Solver method">
         <span class="solver-group-label">Solver</span>
-        <button type="button" class="solver-btn selected" data-solver="llm" aria-pressed="true">LLM</button>
-        <button type="button" class="solver-btn" data-solver="astar" aria-pressed="false">A*</button>
-        <button type="button" class="solver-btn" data-solver="bfs" aria-pressed="false">BFS</button>
-        <button type="button" class="solver-btn" data-solver="dfs" aria-pressed="false">DFS</button>
+        <button type="button" class="solver-btn selected" data-solver="llm" aria-pressed="true" title="LLM tool-use agent — fog-of-war (senses cell by cell)">LLM</button>
+        <button type="button" class="solver-btn" data-solver="dstar_lite" aria-pressed="false" title="D* Lite under the SAME fog-of-war as the LLM — senses, plans over the known map, incrementally repairs on discovery. Fair comparison.">D* Lite</button>
       </div>
       <button id="generate-btn" type="button">Generate</button>
       <button id="solve-btn" type="button" disabled>Solve</button>

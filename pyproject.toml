@@ -1,7 +1,7 @@
 [project]
 name = "mazellm"
 version = "0.2.0"
-description = "An LLM-controlled robot solves a maze it can only sense locally, visualized live in a browser — with classical BFS/DFS/A* baselines for comparison."
+description = "An LLM-controlled robot solves a maze it can only sense locally, visualized live in a browser — with a D* Lite solver under the same fog-of-war for a fair comparison."
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
@@ -10,7 +10,6 @@ dependencies = [
     "openai>=1.40",
     "python-dotenv>=1.0",
     "pydantic>=2.8",
-    "numpy>=1.26.4",
 ]
 
 [project.optional-dependencies]

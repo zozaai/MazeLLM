@@ -9,15 +9,17 @@
 </p>
 
 <p align="center">
-  <a href="docs/architecture-hub-diagram.excalidraw">
+  <a href="docs/maze-llm-robot-hub-diagram.excalidraw">
     <img src="docs/maze-llm-robot-hub-diagram.excalidraw.svg" alt="MazeLLM architecture diagram" width="100%" />
   </a>
 </p>
 
 **MazeLLM** is an experimental project that explores maze solving with an
-LLM tool-use agent, benchmarked against classical pathfinding baselines
-(BFS, DFS, A*). It combines maze generation, robot sensing/movement, and a
-live browser visualization of the solve happening step by step.
+LLM tool-use agent, benchmarked against a classical **D\* Lite** solver that
+runs under the *same* fog-of-war limitation (it only knows cells it has
+sensed) — a fair, apples-to-apples comparison. It combines maze generation,
+robot sensing/movement, and a live browser visualization of the solve
+happening step by step.
 
 ---
 
@@ -25,25 +27,26 @@ live browser visualization of the solve happening step by step.
 
 - **`backend/maze/`** — maze representation, JSON load/save, random maze
   generation, robot state (position + fog-of-war memory of sensed cells).
-- **`backend/agent/`** — the LLM tool-use loop. `llm_client.py` wraps any
+- **`backend/agent/`** — the two solvers plus their shared plumbing.
+  `llm_agent.py` is the LLM tool-use loop; `llm_client.py` wraps any
   OpenAI-compatible `chat.completions` endpoint, so the same code drives
   OpenAI's API, a local vLLM server, Ollama, or a Hugging Face model
-  endpoint — only `.env` changes.
-- **`backend/baselines/`** — classical BFS/DFS/A* solvers, kept as a
-  self-contained package (own maze/robot representation) to compute
-  optimal/ground-truth path lengths for comparison against the LLM agent.
-  This is what lets us actually measure whether fine-tuning improves
-  maze-solving performance, rather than judging it qualitatively.
+  endpoint — only `.env` changes. `dstar_lite.py` is a **D\* Lite** solver
+  that navigates under the identical fog-of-war (senses, plans over the known
+  map treating unseen cells as open, and incrementally repairs the plan as it
+  discovers walls). Both reuse the same `sense_surroundings`/`move` tools and
+  memory rendering, so they emit identical step events — and the D\* Lite
+  transcripts double as an expert source for finetuning the LLM.
 - **`backend/server.py`** — FastAPI app. `POST /maze/generate` builds a
   random maze; `GET /llm/info` and `POST /llm/check` report and smoke-test
   the configured provider; `GET /health` is a liveness probe. The solve
-  itself runs over the `/ws/solve` WebSocket: the server streams an `init`
-  event, then per LLM turn a `memory` event (the exact prompt fed to the
-  model that turn) followed by one `sense`/`move` event per tool call, and
-  finally a `done` (or `error`) event.
+  itself runs over the `/ws/solve` WebSocket (the client picks `"solver":
+  "llm"` or `"dstar_lite"`): the server streams an `init` event, then per turn
+  a `memory` event (what the solver knows that turn) followed by one
+  `sense`/`move` event per action, and finally a `done` (or `error`) event.
 - **`frontend/`** — vanilla HTML/CSS/JS. Renders the maze on a canvas,
-  animates the robot's movement and fog-of-war reveal, and shows a live
-  decision log next to the board.
+  animates the robot's movement and fog-of-war reveal, shows a live decision
+  log, and lets you pick the solver (LLM or D\* Lite) from a button group.
 - **`mazes/`** — hand-authored demo maze JSON files.
 
 ## Setup
@@ -56,8 +59,9 @@ uvicorn backend.server:app --reload
 
 Then open `frontend/index.html` in a browser (or serve it statically). It
 talks to `http://localhost:8000` by default; point it elsewhere with
-`?http=...&ws=...` query params. Use the **Generate** and **Solve** buttons
-to run a maze, or **Check connection** to verify the LLM is reachable.
+`?http=...&ws=...` query params. Pick a **Solver** (LLM or D\* Lite), then use
+the **Generate** and **Solve** buttons to run a maze, or **Check connection**
+to verify the LLM is reachable.
 
 ## Switching LLM providers
 
@@ -70,26 +74,17 @@ Set these in `.env` — no code changes needed:
 | Local Ollama       | `http://localhost:11434/v1`           | e.g. `llama3.1`         |
 | Hugging Face endpoint | your HF Inference Endpoint URL     | your model repo id      |
 
-## Baseline solvers (BFS / DFS / A*)
+## D\* Lite solver (fog-of-war)
 
-`backend/baselines/` ports the original MazeLLM classical solvers. They
-run against their own lightweight maze/robot representation and are meant
-for computing a ground-truth comparison, not for driving the web UI:
-
-```python
-from backend.baselines import BFSSolver
-from backend.baselines.maze import Maze
-from backend.baselines.robot import Robot
-from backend.baselines.types import Position
-
-maze = Maze(cols=10, rows=10, seed=42)
-maze.generate_maze()
-start = maze.find_cell("S")
-robot = Robot(maze=maze, position=Position(x=start.x, y=start.y))
-
-solver = BFSSolver()
-# await solver.next(maze=maze, robot=robot) repeatedly until StepResult.done
-```
+`backend/agent/dstar_lite.py` is the fair-comparison baseline: it solves the
+maze under the **same** limitation as the LLM — it only knows cells it has
+sensed. It plans a shortest route over the known map (treating unseen cells as
+optimistically open), moves only through cells sensing has confirmed open, and
+incrementally repairs the plan when it discovers a wall. Because it drives the
+real robot through the same `sense_surroundings`/`move` tools, it's selectable
+in the web UI and animates with the same fog reveal as the LLM. Its per-turn
+`memory`/`sense`/`move` transcripts are in the LLM's exact format, so they can
+be dumped as expert trajectories for supervised finetuning.
 
 ## Running tests
 
@@ -100,9 +95,8 @@ pytest -m integration   # requires a real OPENAI_API_KEY / provider access
 
 ## Status
 
-Working end-to-end: the LLM tool-use loop, WebSocket streaming, and the
-live canvas frontend (fog-of-war reveal, robot animation, decision log)
-are implemented and covered by tests, alongside BFS/DFS/A* baselines for
-comparison. Not yet wired up: exposing the baseline solvers through the
-web UI/WebSocket so a solve can be run side-by-side with the LLM agent —
-today they're only available as a Python API.
+Working end-to-end: both solvers (LLM tool-use loop and D\* Lite) run over the
+WebSocket under the same fog-of-war and are selectable in the live canvas
+frontend (fog-of-war reveal, robot animation, decision log), covered by tests.
+Next up: dumping D\* Lite expert trajectories as a finetuning dataset to teach
+the LLM to solve mazes more reliably.

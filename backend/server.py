@@ -12,7 +12,8 @@ Client protocol on /ws/solve:
      string under mazes/>, "max_steps": 100, "solver": "llm"} immediately
      after connecting; defaults to sample_maze.json and the LLM solver if
      nothing is sent. "solver" selects the strategy: "llm" (tool-use agent) or
-     any classical baseline in baseline_agent.SOLVERS (currently "astar").
+     a fog-of-war classical solver in dstar_lite.FOG_SOLVERS (currently
+     "dstar_lite") — both work under the same sensed-only view of the maze.
   <- server sends one {"type": "init", width, height, walls, start, end}
      event, then per turn a {"type": "memory", "content": "..."} event
      (what the solver "knows" this turn) followed by one event per action it
@@ -26,10 +27,10 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .agent.dstar_lite import FOG_SOLVERS, DStarLiteAgent
 from .agent.llm_agent import MazeSolvingAgent
 from .agent.llm_client import LLMClient
 from .agent.tools import TOOL_SCHEMAS
-from .baseline_agent import SOLVERS as BASELINE_SOLVERS, BaselineSolvingAgent
 from .config import load_settings
 from .maze.generator import generate_random_maze
 from .maze.maze import Maze
@@ -119,8 +120,8 @@ async def solve(websocket: WebSocket) -> None:
         return
 
     robot = Robot(position=maze.start)
-    if solver in BASELINE_SOLVERS:
-        agent = BaselineSolvingAgent(maze, robot, solver, max_steps=max_steps)
+    if solver in FOG_SOLVERS:  # classical solver under the LLM's fog-of-war limitation
+        agent = DStarLiteAgent(maze, robot, solver, max_steps=max_steps)
     else:  # default: LLM tool-use agent (also covers an unknown/omitted solver)
         llm_client = LLMClient(settings)
         agent = MazeSolvingAgent(maze, robot, llm_client, max_steps=max_steps)

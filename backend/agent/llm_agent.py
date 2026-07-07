@@ -17,6 +17,59 @@ NUDGE_MESSAGE = "Please call sense_surroundings or move to continue."
 MEMORY_MESSAGE_INDEX = 1
 
 
+def build_memory_message(maze: Maze, robot: Robot) -> str:
+    """Render everything known about the maze so far — the robot's position,
+    the path it took to get here, and a full-size grid of the maze — so a model
+    with weak long-context tracking still has explicit, accurate grounding every
+    turn instead of relying on scrollback.
+
+    The grid always spans the maze's true width/height and always marks the
+    start and end cells — a robot placed in a room would know the room's extent
+    and its target destination even before exploring it, the same way the
+    human-facing board always shows the full grid and the end flag regardless of
+    fog-of-war. Only wall/open status is actually gated on having sensed that
+    cell ('?' until then).
+
+    Shared by the LLM agent and the fog-of-war solvers so both operate on — and
+    emit — the identical observation, keeping the comparison fair and the
+    transcripts format-compatible.
+    """
+    known = robot.known_cells
+    visited = [maze.start] + [record.position_after for record in robot.history]
+
+    def symbol(cell: tuple[int, int]) -> str:
+        if cell == robot.position:
+            return "R"
+        if cell == maze.start:
+            return "S"
+        if cell == maze.end:
+            return "E"
+        status = known.get(cell)
+        if status == "wall":
+            return "#"
+        if status == "open":
+            return "."
+        return "?"
+
+    header = "     " + " ".join(f"{x:>2}" for x in range(maze.width))
+    rows = [header]
+    for y in range(maze.height):
+        row_cells = " ".join(f"{symbol((x, y)):>2}" for x in range(maze.width))
+        rows.append(f"y={y:<3}{row_cells}")
+    grid = "\n".join(rows)
+
+    path = " -> ".join(f"({x},{y})" for x, y in visited)
+
+    return (
+        f"Current position: {tuple(robot.position)}\n"
+        f"Path so far: {path}\n"
+        f"Known map so far (full maze size: {maze.width}x{maze.height}, rows=y, columns=x):\n"
+        "  '?'=unexplored   '.'=open   '#'=wall\n"
+        "  'S'=start   'E'=end   'R'=you now\n"
+        f"{grid}"
+    )
+
+
 class MazeSolvingAgent:
     def __init__(self, maze: Maze, robot: Robot, llm_client: LLMClient, max_steps: int = 200):
         self.maze = maze
@@ -30,52 +83,7 @@ class MazeSolvingAgent:
         self._pending_sensed: dict[str, dict] = {}
 
     def _build_memory_message(self) -> str:
-        """Render everything known about the maze so far — the robot's
-        position, the path it took to get here, and a full-size grid of the
-        maze — so a model with weak long-context tracking still has explicit,
-        accurate grounding every turn instead of relying on scrollback.
-
-        The grid always spans the maze's true width/height and always marks
-        the start and end cells — a robot placed in a room would know the
-        room's extent and its target destination even before exploring it,
-        the same way the human-facing board always shows the full grid and
-        the end flag regardless of fog-of-war. Only wall/open status is
-        actually gated on having sensed that cell ('?' until then).
-        """
-        known = self.robot.known_cells
-        visited = [self.maze.start] + [record.position_after for record in self.robot.history]
-
-        def symbol(cell: tuple[int, int]) -> str:
-            if cell == self.robot.position:
-                return "R"
-            if cell == self.maze.start:
-                return "S"
-            if cell == self.maze.end:
-                return "E"
-            status = known.get(cell)
-            if status == "wall":
-                return "#"
-            if status == "open":
-                return "."
-            return "?"
-
-        header = "     " + " ".join(f"{x:>2}" for x in range(self.maze.width))
-        rows = [header]
-        for y in range(self.maze.height):
-            row_cells = " ".join(f"{symbol((x, y)):>2}" for x in range(self.maze.width))
-            rows.append(f"y={y:<3}{row_cells}")
-        grid = "\n".join(rows)
-
-        path = " -> ".join(f"({x},{y})" for x, y in visited)
-
-        return (
-            f"Current position: {tuple(self.robot.position)}\n"
-            f"Path so far: {path}\n"
-            f"Known map so far (full maze size: {self.maze.width}x{self.maze.height}, rows=y, columns=x):\n"
-            "  '?'=unexplored   '.'=open   '#'=wall\n"
-            "  'S'=start   'E'=end   'R'=you now\n"
-            f"{grid}"
-        )
+        return build_memory_message(self.maze, self.robot)
 
     async def run_step(self) -> list[dict]:
         """Run one LLM turn and execute whatever tool calls it makes.
