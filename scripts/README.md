@@ -13,13 +13,14 @@ target model (its chat/tool-call format, its finetuning recipe) lives under
 ```
 scripts/
   expert_client.py          # generic: D* Lite expert as a fake LLM client; records neutral decisions
-  dataset_gen.py            # generic: run the sweep, dedup, write JSONL via a model formatter
-  LFM2.5-1.2B-Instruct/     # model-specific: LFM2 formatter + entrypoint + finetuning notes
-    lfm2_format.py
+  dataset_gen.py            # generic: run the sweep, cap dups, write JSONL via a model formatter
+  eval_core.py              # generic: D* Lite reference + metric aggregation for eval
+  qwen3.5/                  # model-specific: Qwen formatter + entrypoint + finetuning notes
+    qwen_format.py
     generate.py
     README.md
 data/
-  LFM2.5-1.2B-Instruct/     # generated dataset (gitignored)
+  qwen3.5/                  # generated dataset (gitignored)
     maze_sft.jsonl
     tool_schemas.json
 ```
@@ -36,8 +37,11 @@ each *move* example is conditioned on the map *after* the preceding sense — it
 teaches "sense the unknown before you step into it," the habit the base model
 lacks. Each turn is captured as a **neutral** record (system prompt, memory grid,
 tool name + args, rationale); the per-model formatter renders it into that
-model's chat format. Exact-duplicate decisions are deduped (early-turn states
-repeat across mazes because the start cell is fixed).
+model's chat format. Duplicate decisions are **kept by default** — for behavior
+cloning, example frequency should track how often a state is visited (every
+episode starts by sensing at the start cell, so that decision is legitimately
+common; deduping it away biases the model against sensing). Use `--dup-cap N`
+only to trim extreme repeats.
 
 Each `.jsonl` line is one decision:
 
@@ -49,20 +53,19 @@ Each `.jsonl` line is one decision:
 ## Run
 
 ```bash
-python scripts/LFM2.5-1.2B-Instruct/generate.py --sizes 5,8,10 --per-size 500
+python scripts/qwen3.5/generate.py --sizes 5,6,7,8,9,10 --per-size 1000
 ```
 
-See `scripts/LFM2.5-1.2B-Instruct/README.md` for that model's format and
-finetuning recipe.
+See `scripts/qwen3.5/README.md` for that model's format and finetuning recipe.
 
 ## Add another target model
 
-1. Create `scripts/<model>/lfm2_format.py`-equivalent exposing `format_example(turn,
+1. Create `scripts/<model>/<model>_format.py` exposing `format_example(turn,
    include_rationale)` (neutral turn → `{"messages": [...], "meta": ...}`) and
    `tool_schemas()` in that model's expected shape.
 2. Create `scripts/<model>/generate.py` that imports `dataset_gen`
-   (`run_sweep`, `dedup`, `write_dataset`) and your formatter, writing to
-   `data/<model>/`.
+   (`run_sweep`, `cap_duplicates`, `write_dataset`) and your formatter, writing
+   to `data/<model>/`.
 
 The generic core (`expert_client.py`, `dataset_gen.py`) stays untouched.
 

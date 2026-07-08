@@ -6,8 +6,39 @@ direct access to the maze grid.
 """
 from __future__ import annotations
 
+import re
+
 from ..maze.maze import Cell, Maze
 from ..maze.robot import DIRECTIONS, Robot
+
+# Fallback parser for models/servers that return the tool call as text in the
+# assistant `content` instead of structured `tool_calls` — e.g. LFM2 served
+# through Unsloth, which emits `<|tool_call_start|>[move(direction="down",
+# distance=4)]<|tool_call_end|>` and cannot map it to OpenAI tool_calls. Anchored
+# to the known tool names so it never misfires on prose like "at (0,0)".
+_TEXT_CALL_RE = re.compile(r"\b(sense_surroundings|move)\s*\(([^)]*)\)")
+_TEXT_ARG_RE = re.compile(r"""(\w+)\s*=\s*("[^"]*"|'[^']*'|[^,]+)""")
+
+
+def parse_text_tool_call(content: str | None) -> tuple[str, dict] | None:
+    """Extract (name, args) for the first tool call embedded in free text, or None."""
+    if not content:
+        return None
+    match = _TEXT_CALL_RE.search(content)
+    if not match:
+        return None
+    name, argstr = match.group(1), match.group(2).strip()
+    args: dict = {}
+    for key, raw in _TEXT_ARG_RE.findall(argstr):
+        raw = raw.strip()
+        if raw[:1] in "\"'":
+            args[key] = raw[1:-1]
+        else:
+            try:
+                args[key] = int(raw)
+            except ValueError:
+                args[key] = raw
+    return name, args
 
 TOOL_SCHEMAS = [
     {

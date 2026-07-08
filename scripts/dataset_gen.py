@@ -55,17 +55,23 @@ async def run_sweep(sizes, per_size, density, seed, rationale, log=print):
     return turns, {"solved": solved, "failed": failed}
 
 
-def dedup(turns):
-    """Drop exact-duplicate decisions. Keyed on (memory, tool name, args) — which
-    fully determines an example — so it's independent of the output format. With a
-    fixed start cell, early-turn states repeat across mazes; without this they'd
-    be over-weighted."""
-    seen, out = set(), []
+def cap_duplicates(turns, cap=0):
+    """Optionally cap how many copies of each identical decision are kept.
+
+    For behavior cloning you generally WANT example frequency to track how often
+    a state is visited (every episode starts by sensing at the start cell, so
+    that decision is legitimately common). So the default (cap=0) keeps all
+    duplicates. A positive `cap` only trims the extreme repeats (e.g. the
+    500-per-size start-sense) to reduce bloat without erasing the signal.
+    Keyed on (memory, tool name, args), which fully determines an example."""
+    if not cap:
+        return turns
+    counts, out = {}, []
     for t in turns:
         key = json.dumps([t["memory"], t["name"], t["args"]], sort_keys=True)
         h = hashlib.md5(key.encode()).hexdigest()
-        if h not in seen:
-            seen.add(h)
+        counts[h] = counts.get(h, 0) + 1
+        if counts[h] <= cap:
             out.append(t)
     return out
 

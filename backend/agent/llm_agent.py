@@ -7,7 +7,7 @@ from ..maze.maze import Maze
 from ..maze.robot import Robot
 from .llm_client import LLMClient
 from .prompts import SYSTEM_PROMPT
-from .tools import TOOL_SCHEMAS, move, sense_surroundings
+from .tools import TOOL_SCHEMAS, move, parse_text_tool_call, sense_surroundings
 
 NUDGE_MESSAGE = "Please call sense_surroundings or move to continue."
 
@@ -105,6 +105,17 @@ class MazeSolvingAgent:
         message = response.choices[0].message
         tool_calls = message.tool_calls or []
 
+        # Normalize to (id, name, args). Prefer structured tool_calls; otherwise
+        # fall back to parsing a call out of the text content — needed for
+        # servers (e.g. LFM2 via Unsloth) that return the call as plain text.
+        calls: list[tuple[str, str, dict]] = []
+        for call in tool_calls:
+            calls.append((call.id, call.function.name, json.loads(call.function.arguments or "{}")))
+        if not calls:
+            parsed = parse_text_tool_call(message.content)
+            if parsed:
+                calls.append((f"call_{len(self.messages)}", parsed[0], parsed[1]))
+
         assistant_message: dict = {"role": "assistant", "content": message.content}
         if tool_calls:
             assistant_message["tool_calls"] = [
@@ -118,15 +129,14 @@ class MazeSolvingAgent:
         self.messages.append(assistant_message)
 
         events: list[dict] = [{"type": "memory", "content": memory_content}]
-        for call in tool_calls:
-            args = json.loads(call.function.arguments or "{}")
-            event, result = self._execute_tool_call(call.function.name, args, message.content)
+        for call_id, name, args in calls:
+            event, result = self._execute_tool_call(name, args, message.content)
             events.append(event)
             self.messages.append(
-                {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result)}
+                {"role": "tool", "tool_call_id": call_id, "content": json.dumps(result)}
             )
 
-        if not tool_calls:
+        if not calls:
             self.messages.append({"role": "user", "content": NUDGE_MESSAGE})
 
         return events
