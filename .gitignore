@@ -14,3 +14,6 @@ data/
 # Training artifacts (LoRA adapters, merged/quantized GGUF exports)
 scripts/*/outputs/
 *.gguf
+
+# Unsloth's auto-generated compiled-trainer cache
+unsloth_compiled_cache/

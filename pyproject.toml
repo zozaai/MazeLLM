@@ -18,6 +18,11 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-cov>=5.0",
 ]
+finetune = [
+    "unsloth",
+    "datasets>=2.16",
+    "trl>=0.9",
+]
 
 [tool.setuptools.packages.find]
 include = ["backend*"]
