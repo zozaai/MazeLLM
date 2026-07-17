@@ -10,3 +10,7 @@ coverage.xml
 
 # Generated finetuning datasets
 data/
+
+# Training artifacts (LoRA adapters, merged/quantized GGUF exports)
+scripts/*/outputs/
+*.gguf
