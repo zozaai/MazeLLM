@@ -79,7 +79,7 @@ def main():
     # are imported (and initialized) first.
     from unsloth import FastLanguageModel, is_bfloat16_supported
     from unsloth.chat_templates import train_on_responses_only
-    from datasets import load_dataset
+    from datasets import Dataset
     from transformers import DataCollatorForSeq2Seq
     from trl import SFTConfig, SFTTrainer
 
@@ -88,7 +88,9 @@ def main():
         max_seq_length=args.max_seq_length,
         dtype=None,
         load_in_4bit=args.load_in_4bit,
+        use_gradient_checkpointing=False,
     )
+
     model = FastLanguageModel.get_peft_model(
         model,
         r=args.r,
@@ -96,34 +98,34 @@ def main():
         lora_dropout=args.lora_dropout,
         target_modules=TARGET_MODULES,
         bias="none",
-        use_gradient_checkpointing="unsloth",
+        use_gradient_checkpointing=False,
         random_state=args.seed,
         use_rslora=False,
     )
 
     tools = json.load(open(args.tools))
-    dataset = load_dataset("json", data_files=args.data, split="train")
 
-    def fmt(example):
-        # Same call the real app effectively relies on Ollama to make at
-        # inference time — training and serving must render through the
-        # identical template, or the fine-tune won't transfer.
-        return {"text": tokenizer.apply_chat_template(example["messages"], tools=tools, tokenize=False)}
-
-    # Drop every original column (messages, meta) so only "text" remains.
-    # This matters: newer trl treats ANY dataset with a "messages" column as
-    # "conversational" and re-derives input_ids straight from "messages" via
-    # its OWN apply_chat_template call inside SFTTrainer — silently ignoring
-    # the precomputed "text" field above, and critically without our `tools`
-    # (it only looks for a *per-example* "tools" column, which doesn't exist
-    # here). That produced a chat-template render with no tool listing
-    # injected into the user turn, which — depending on trl/tokenizer
-    # version — can shift the rendered text enough that
-    # `train_on_responses_only`'s marker search finds zero matches and masks
-    # the entire dataset to -100. Dropping "messages" forces the
-    # dataset_text_field="text" path, which has tools baked in and is the
-    # one actually verified against the real chat template (see llama_format.py).
-    dataset = dataset.map(fmt, remove_columns=dataset.column_names)
+    # Parse the JSONL in plain Python rather than via `datasets.load_dataset`.
+    # That loader infers ONE fixed Arrow struct schema for
+    # `tool_calls[0].function.arguments` across the whole file — and since
+    # `sense_surroundings` calls have `arguments: {}` while `move` calls have
+    # `arguments: {direction, distance}`, it silently backfills every
+    # sense_surroundings example with `direction: null, distance: null` before
+    # `apply_chat_template` ever sees it, corrupting the rendered tool call
+    # (confirmed: `datasets.load_dataset("json", ...)` alone turns `{}` into
+    # `{"direction": None, "distance": None}`). Rendering "text" straight from
+    # the raw parsed JSON, and only ever wrapping the finished strings in a
+    # Dataset, sidesteps this — a single string column can't be miscoerced.
+    # It also means "messages" never reaches trl, so its own conversational
+    # auto-detection (which re-derives input_ids from "messages" without our
+    # `tools`, potentially masking the whole dataset to -100 in
+    # `train_on_responses_only`) never comes into play either.
+    texts = []
+    with open(args.data) as f:
+        for line in f:
+            example = json.loads(line)
+            texts.append(tokenizer.apply_chat_template(example["messages"], tools=tools, tokenize=False))
+    dataset = Dataset.from_dict({"text": texts})
 
     trainer = SFTTrainer(
         model=model,
@@ -135,8 +137,10 @@ def main():
             max_length=args.max_seq_length,
             dataset_num_proc=2,
             packing=False,
+            group_by_length=True,
             per_device_train_batch_size=args.batch_size,
             gradient_accumulation_steps=args.grad_accum,
+            gradient_checkpointing=False,
             warmup_steps=args.warmup_steps,
             num_train_epochs=args.epochs,
             learning_rate=args.learning_rate,
@@ -160,7 +164,14 @@ def main():
         response_part="<|start_header_id|>assistant<|end_header_id|>\n\n",
     )
 
-    trainer.train()
+    print("Gradient checkpointing:", model.is_gradient_checkpointing)
+    print("Device map:", getattr(model, "hf_device_map", None))
+
+    train_result = trainer.train()
+
+    print("\nTraining metrics:")
+    for key, value in train_result.metrics.items():
+        print(f"  {key}: {value}")
 
     os.makedirs(args.out_dir, exist_ok=True)
     model.save_pretrained(args.out_dir)
